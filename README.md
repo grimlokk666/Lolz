@@ -43,6 +43,9 @@ npm run worker:webcams
 - **`components/GlobeView.tsx`** — full-screen Cesium viewer, layer entities, click → fly-to
 - **`components/RegionalInspector.tsx`** — cams / airspace / audio inspector drawer
 - **`workers/webcam_discovery.py`** — Shodan OSINT ingest with rate limiting + PostGIS upsert
+- **`workers/flock_discovery.py`** — Overpass OSM ALPR / Flock Safety camera ingest (DeFlock-class public tags)
+- **`/api/flock`** — global + regional Flock/ALPR layer (live Overpass with PostGIS/seed fallback)
+- HUD **Flock ALPR** layer + Regional Inspector **Flock** tab
 - **`app/api/airspace`** — OpenSky / ADS-B proxy, GeoJSON option, demo fallback
 - **`app/api/audio-proxy`** — allowlisted Icecast/Shoutcast CORS/protocol bridge
 - **`app/api/region`** — PostGIS `ST_DWithin` sector query (±25 mi default)
