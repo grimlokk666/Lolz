@@ -29,11 +29,13 @@ import {
   Viewer as CesiumViewer,
   createWorldImageryAsync,
   ImageryLayer,
+  TileMapServiceImageryProvider,
   UrlTemplateImageryProvider,
   Ion,
   NearFarScalar,
   DistanceDisplayCondition,
   LabelStyle,
+  buildModuleUrl,
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { useMasterEyeStore } from "@/lib/store";
@@ -42,6 +44,12 @@ import type { Aircraft, AudioFeed, WebcamAsset } from "@/types/master-eye";
 if (typeof window !== "undefined") {
   (window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL =
     "/cesium/";
+  // Ensure Cesium module URL builder resolves against our static copy
+  (
+    buildModuleUrl as typeof buildModuleUrl & {
+      setBaseUrl: (url: string) => void;
+    }
+  ).setBaseUrl("/cesium/");
 }
 
 const ionToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
@@ -53,12 +61,16 @@ interface GlobeViewProps {
   webcams: WebcamAsset[];
   audioFeeds: AudioFeed[];
   aircraft: Aircraft[];
-  onInspect: (lat: number, lon: number, meta?: { entityId?: string; entityType?: "aircraft" | "webcam" | "audio" }) => void;
+  onInspect: (
+    lat: number,
+    lon: number,
+    meta?: { entityId?: string; entityType?: "aircraft" | "webcam" | "audio" }
+  ) => void;
 }
 
 function headingToColor(heading: number | null): Color {
   if (heading == null) return Color.CYAN;
-  const t = ((heading % 360) + 360) % 360 / 360;
+  const t = ((((heading % 360) + 360) % 360) / 360);
   return Color.fromHsl(0.5 + t * 0.15, 0.9, 0.55);
 }
 
@@ -69,11 +81,15 @@ export default function GlobeView({
   onInspect,
 }: GlobeViewProps) {
   const viewerRef = useRef<CesiumComponentRef<CesiumViewer>>(null);
+  const onInspectRef = useRef(onInspect);
+  const initDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const layers = useMasterEyeStore((s) => s.layers);
   const flyToTarget = useMasterEyeStore((s) => s.flyToTarget);
   const trackedAircraftId = useMasterEyeStore((s) => s.trackedAircraftId);
   const setFlyToTarget = useMasterEyeStore((s) => s.setFlyToTarget);
+
+  onInspectRef.current = onInspect;
 
   const tracked = useMemo(
     () => aircraft.find((a) => a.icao24 === trackedAircraftId) ?? null,
@@ -89,9 +105,10 @@ export default function GlobeView({
     );
   }, [flyToTarget]);
 
-  useEffect(() => {
+  const handleViewerReady = useCallback(() => {
     const viewer = viewerRef.current?.cesiumElement;
-    if (!viewer || viewer.isDestroyed()) return;
+    if (!viewer || viewer.isDestroyed() || initDoneRef.current) return;
+    initDoneRef.current = true;
 
     viewer.scene.globe.enableLighting = true;
     viewer.scene.globe.atmosphereLightIntensity = 10;
@@ -102,36 +119,47 @@ export default function GlobeView({
     }
     viewer.scene.fog.enabled = true;
     viewer.scene.backgroundColor = Color.fromCssColorString("#030712");
-    viewer.imageryLayers.removeAll();
+    viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1220");
+
+    // Hide default credits container without remounting Viewer
+    const credit = viewer.cesiumWidget.creditContainer as HTMLElement | undefined;
+    if (credit) credit.style.display = "none";
 
     let cancelled = false;
 
     (async () => {
       try {
+        viewer.imageryLayers.removeAll();
         if (ionToken) {
           const world = await createWorldImageryAsync();
           if (!cancelled && !viewer.isDestroyed()) {
             viewer.imageryLayers.addImageryProvider(world);
           }
         } else {
-          const provider = new UrlTemplateImageryProvider({
-            url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            maximumLevel: 18,
-          });
+          // Bundled Natural Earth II — no external tile CORS / rate limits
+          const provider = await TileMapServiceImageryProvider.fromUrl(
+            buildModuleUrl("Assets/Textures/NaturalEarthII")
+          );
           if (!cancelled && !viewer.isDestroyed()) {
             viewer.imageryLayers.add(new ImageryLayer(provider));
           }
         }
-      } catch {
-        if (!cancelled && !viewer.isDestroyed()) {
-          const provider = new UrlTemplateImageryProvider({
-            url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            maximumLevel: 18,
-          });
-          viewer.imageryLayers.add(new ImageryLayer(provider));
+      } catch (err) {
+        console.warn("[GlobeView] primary imagery failed, OSM fallback", err);
+        try {
+          if (!cancelled && !viewer.isDestroyed()) {
+            const provider = new UrlTemplateImageryProvider({
+              url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+              maximumLevel: 8,
+            });
+            viewer.imageryLayers.add(new ImageryLayer(provider));
+          }
+        } catch (fallbackErr) {
+          console.warn("[GlobeView] imagery fallback failed", fallbackErr);
         }
+      } finally {
+        if (!cancelled) setReady(true);
       }
-      if (!cancelled) setReady(true);
     })();
 
     const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -158,7 +186,7 @@ export default function GlobeView({
         const entityType = readProp("entityType");
         const entityId = readProp("entityId");
         if (typeof lat === "number" && typeof lon === "number") {
-          onInspect(lat, lon, {
+          onInspectRef.current(lat, lon, {
             entityId: entityId != null ? String(entityId) : undefined,
             entityType: entityType as
               | "aircraft"
@@ -175,16 +203,38 @@ export default function GlobeView({
       );
       if (!cartesian) return;
       const carto = Cartographic.fromCartesian(cartesian);
-      const lat = CesiumMath.toDegrees(carto.latitude);
-      const lon = CesiumMath.toDegrees(carto.longitude);
-      onInspect(lat, lon);
+      onInspectRef.current(
+        CesiumMath.toDegrees(carto.latitude),
+        CesiumMath.toDegrees(carto.longitude)
+      );
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     return () => {
       cancelled = true;
       handler.destroy();
     };
-  }, [onInspect]);
+  }, []);
+
+  useEffect(() => {
+    // Poll briefly until Resium mounts the Viewer instance
+    let attempts = 0;
+    let cleanup: (() => void) | undefined;
+    const id = window.setInterval(() => {
+      attempts += 1;
+      const viewer = viewerRef.current?.cesiumElement;
+      if (viewer && !viewer.isDestroyed()) {
+        window.clearInterval(id);
+        cleanup = handleViewerReady() ?? undefined;
+      } else if (attempts > 80) {
+        window.clearInterval(id);
+        setReady(true);
+      }
+    }, 100);
+    return () => {
+      window.clearInterval(id);
+      cleanup?.();
+    };
+  }, [handleViewerReady]);
 
   useEffect(() => {
     const viewer = viewerRef.current?.cesiumElement;
@@ -223,7 +273,6 @@ export default function GlobeView({
         fullscreenButton={false}
         infoBox={false}
         selectionIndicator={false}
-        creditContainer={typeof document !== "undefined" ? document.createElement("div") : undefined}
         terrainProvider={undefined}
         className="h-full w-full"
       >
@@ -236,7 +285,8 @@ export default function GlobeView({
           />
         )}
 
-        {ready && layers.webcams &&
+        {ready &&
+          layers.webcams &&
           webcams.map((cam) => (
             <Entity
               key={`cam-${cam.id}`}
@@ -270,17 +320,24 @@ export default function GlobeView({
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
                 distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
                 showBackground
-                backgroundColor={Color.fromCssColorString("#030712").withAlpha(0.75)}
+                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
+                  0.75
+                )}
               />
             </Entity>
           ))}
 
-        {ready && layers.audio &&
+        {ready &&
+          layers.audio &&
           audioFeeds.map((feed) => (
             <Entity
               key={`audio-${feed.id}`}
               name={feed.name}
-              position={Cartesian3.fromDegrees(feed.longitude, feed.latitude, 400)}
+              position={Cartesian3.fromDegrees(
+                feed.longitude,
+                feed.latitude,
+                400
+              )}
               properties={{
                 latitude: feed.latitude,
                 longitude: feed.longitude,
@@ -307,12 +364,15 @@ export default function GlobeView({
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
                 distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
                 showBackground
-                backgroundColor={Color.fromCssColorString("#030712").withAlpha(0.75)}
+                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
+                  0.75
+                )}
               />
             </Entity>
           ))}
 
-        {ready && layers.aircraft &&
+        {ready &&
+          layers.aircraft &&
           aircraft.map((ac) => (
             <Entity
               key={`ac-${ac.icao24}`}

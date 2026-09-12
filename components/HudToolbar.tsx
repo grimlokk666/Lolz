@@ -56,8 +56,10 @@ export default function HudToolbar() {
         <div className="pointer-events-auto rounded-sm border border-cyan-500/40 bg-black/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-cyan-300 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <Satellite className="h-3.5 w-3.5 animate-pulse text-cyan-400" />
-            <span className="drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
-              {new Date(clock).toISOString().replace("T", " ").slice(0, 19)} Zulu
+            <span className="drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" suppressHydrationWarning>
+              {clock
+                ? `${new Date(clock).toISOString().replace("T", " ").slice(0, 19)} Zulu`
+                : "SYNC…"}
             </span>
           </div>
         </div>

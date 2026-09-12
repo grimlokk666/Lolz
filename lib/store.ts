@@ -54,7 +54,7 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   globalAudio: [],
   globalAircraft: [],
   statusMessage: "SYSTEM ONLINE — AWAITING COORDINATE LOCK",
-  clock: new Date().toISOString(),
+  clock: "",
   setLayer: (id, enabled) =>
     set((s) => ({ layers: { ...s.layers, [id]: enabled } })),
   toggleLayer: (id) =>
@@ -92,3 +92,8 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   setStatusMessage: (msg) => set({ statusMessage: msg }),
   tickClock: () => set({ clock: new Date().toISOString() }),
 }));
+
+// Avoid SSR/client mismatch: seed clock only on client
+if (typeof window !== "undefined") {
+  useMasterEyeStore.setState({ clock: new Date().toISOString() });
+}
