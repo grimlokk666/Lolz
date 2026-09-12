@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #030712;
+  --foreground: #ecfeff;
+  --tactical-cyan: #22d3ee;
+  --tactical-border: rgba(6, 182, 212, 0.4);
+  --tactical-glow: rgba(6, 182, 212, 0.5);
+  --panel: rgba(0, 0, 0, 0.7);
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+body {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display), var(--font-mono), sans-serif;
+}
+
+/* Cesium chrome suppression */
+.cesium-viewer-bottom,
+.cesium-viewer-toolbar,
+.cesium-viewer-animationContainer,
+.cesium-viewer-timelineContainer,
+.cesium-credit-logoContainer,
+.cesium-credit-textContainer {
+  display: none !important;
+}
+
+.cesium-viewer,
+.cesium-viewer-cesiumWidgetContainer,
+.cesium-widget,
+.cesium-widget canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Custom scrollbars for tactical panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(3, 7, 18, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.35);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.55);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .tactical-glow {
+    text-shadow: 0 0 8px var(--tactical-glow);
+  }
+  .glass-panel {
+    @apply border border-cyan-500/40 bg-black/70 backdrop-blur-md;
+  }
+}

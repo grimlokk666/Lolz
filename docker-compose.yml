@@ -1,0 +1,55 @@
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: master-eye-postgis
+    environment:
+      POSTGRES_USER: mastereye
+      POSTGRES_PASSWORD: mastereye_dev
+      POSTGRES_DB: mastereye
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mastereye -d mastereye"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  telemetry:
+    build:
+      context: ./services/telemetry
+      dockerfile: Dockerfile
+    container_name: master-eye-telemetry
+    environment:
+      PORT: 4100
+      DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
+      CORS_ORIGIN: http://localhost:3000
+      OPENSKY_USERNAME: ${OPENSKY_USERNAME:-}
+      OPENSKY_PASSWORD: ${OPENSKY_PASSWORD:-}
+    ports:
+      - "4100:4100"
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  webcam-worker:
+    build:
+      context: ./workers
+      dockerfile: Dockerfile
+    container_name: master-eye-webcam-worker
+    environment:
+      DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-300}
+      WORKER_DEMO_MODE: ${WORKER_DEMO_MODE:-true}
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgis_data:
