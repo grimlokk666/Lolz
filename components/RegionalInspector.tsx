@@ -63,7 +63,7 @@ export default function RegionalInspector() {
   return (
     <aside
       className={cn(
-        "pointer-events-auto absolute bottom-0 right-0 top-0 z-40 flex w-full max-w-md flex-col border-l border-cyan-500/40 bg-black/70 shadow-[-20px_0_60px_rgba(0,0,0,0.65)] backdrop-blur-md transition-transform duration-500 ease-out",
+        "pointer-events-auto absolute bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l border-cyan-500/40 bg-black/80 shadow-[-20px_0_60px_rgba(0,0,0,0.65)] backdrop-blur-md transition-transform duration-500 ease-out",
         inspectorOpen ? "translate-x-0" : "translate-x-full"
       )}
     >

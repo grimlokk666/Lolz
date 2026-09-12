@@ -52,14 +52,24 @@ export default function CommandCenter() {
         const [camsRes, audioRes, airRes] = await Promise.all([
           fetch("/api/webcams"),
           fetch("/api/audio-feeds"),
-          fetch(
-            `/api/airspace?lamin=24&lamax=50&lomin=-125&lomax=-66`
-          ),
+          fetch(`/api/airspace?lamin=24&lamax=50&lomin=-125&lomax=-66`),
         ]);
 
-        const cams = await camsRes.json();
-        const audio = await audioRes.json();
-        const air = await airRes.json();
+        const parseJson = async (res: Response, label: string) => {
+          const text = await res.text();
+          if (!res.ok) {
+            throw new Error(`${label} HTTP ${res.status}`);
+          }
+          try {
+            return JSON.parse(text);
+          } catch {
+            throw new Error(`${label} returned non-JSON`);
+          }
+        };
+
+        const cams = await parseJson(camsRes, "webcams");
+        const audio = await parseJson(audioRes, "audio");
+        const air = await parseJson(airRes, "airspace");
 
         if (cancelled) return;
         setGlobalWebcams(cams.webcams ?? []);

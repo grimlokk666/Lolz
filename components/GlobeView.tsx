@@ -28,7 +28,6 @@ import {
   Cartographic,
   Viewer as CesiumViewer,
   createWorldImageryAsync,
-  ImageryLayer,
   TileMapServiceImageryProvider,
   UrlTemplateImageryProvider,
   Ion,
@@ -136,12 +135,13 @@ export default function GlobeView({
             viewer.imageryLayers.addImageryProvider(world);
           }
         } else {
-          // Bundled Natural Earth II — no external tile CORS / rate limits
+          // Bundled Natural Earth II — absolute public URL (no Ion required)
           const provider = await TileMapServiceImageryProvider.fromUrl(
-            buildModuleUrl("Assets/Textures/NaturalEarthII")
+            "/cesium/Assets/Textures/NaturalEarthII",
+            { fileExtension: "jpg" }
           );
           if (!cancelled && !viewer.isDestroyed()) {
-            viewer.imageryLayers.add(new ImageryLayer(provider));
+            viewer.imageryLayers.addImageryProvider(provider);
           }
         }
       } catch (err) {
@@ -152,13 +152,16 @@ export default function GlobeView({
               url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
               maximumLevel: 8,
             });
-            viewer.imageryLayers.add(new ImageryLayer(provider));
+            viewer.imageryLayers.addImageryProvider(provider);
           }
         } catch (fallbackErr) {
           console.warn("[GlobeView] imagery fallback failed", fallbackErr);
         }
       } finally {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setReady(true);
+          viewer.scene.requestRender?.();
+        }
       }
     })();
 

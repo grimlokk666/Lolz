@@ -135,7 +135,7 @@ export async function fetchAirspace(params: {
             "x-rapidapi-key": rapidKey,
             "x-rapidapi-host": host,
           },
-          signal: AbortSignal.timeout(12_000),
+          signal: AbortSignal.timeout(4_000),
         }
       );
       if (res.ok) {
