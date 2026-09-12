@@ -87,6 +87,39 @@ CREATE INDEX IF NOT EXISTS idx_aircraft_location ON aircraft_snapshots USING GIS
 CREATE INDEX IF NOT EXISTS idx_aircraft_icao ON aircraft_snapshots (icao24);
 CREATE INDEX IF NOT EXISTS idx_aircraft_recorded ON aircraft_snapshots (recorded_at DESC);
 
+-- Flock Safety / ALPR camera locations (OSM Overpass / OSINT ingest)
+CREATE TABLE IF NOT EXISTS flock_cameras (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  osm_id            TEXT UNIQUE,
+  name              TEXT,
+  manufacturer      TEXT,
+  model             TEXT,
+  operator          TEXT,
+  city              TEXT,
+  state             TEXT,
+  country           TEXT,
+  country_code      CHAR(2),
+  latitude          DOUBLE PRECISION NOT NULL,
+  longitude         DOUBLE PRECISION NOT NULL,
+  location          GEOGRAPHY(POINT, 4326) GENERATED ALWAYS AS (
+                      ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
+                    ) STORED,
+  direction         DOUBLE PRECISION,
+  surveillance_type TEXT DEFAULT 'ALPR',
+  source            TEXT DEFAULT 'overpass',
+  tags              TEXT[] DEFAULT '{}',
+  raw_tags          JSONB DEFAULT '{}',
+  is_active         BOOLEAN DEFAULT TRUE,
+  last_seen_at      TIMESTAMPTZ DEFAULT NOW(),
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_flock_location ON flock_cameras USING GIST (location);
+CREATE INDEX IF NOT EXISTS idx_flock_active ON flock_cameras (is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_flock_manufacturer ON flock_cameras (manufacturer);
+CREATE INDEX IF NOT EXISTS idx_flock_osm ON flock_cameras (osm_id);
+
 -- Regional inspection query log (ops telemetry)
 CREATE TABLE IF NOT EXISTS inspection_events (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -96,6 +129,7 @@ CREATE TABLE IF NOT EXISTS inspection_events (
   webcam_count  INTEGER DEFAULT 0,
   audio_count   INTEGER DEFAULT 0,
   aircraft_count INTEGER DEFAULT 0,
+  flock_count   INTEGER DEFAULT 0,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -162,6 +196,34 @@ BEGIN
   WHERE a.is_active = TRUE
     AND ST_DWithin(
       a.location,
+      ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography,
+      p_radius_m
+    )
+
+  UNION ALL
+
+  SELECT
+    'flock'::TEXT,
+    f.id,
+    COALESCE(f.name, f.manufacturer, f.model, 'ALPR'),
+    f.latitude,
+    f.longitude,
+    ST_Distance(f.location, ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography),
+    jsonb_build_object(
+      'osm_id', f.osm_id,
+      'manufacturer', f.manufacturer,
+      'model', f.model,
+      'operator', f.operator,
+      'city', f.city,
+      'state', f.state,
+      'surveillance_type', f.surveillance_type,
+      'direction', f.direction,
+      'tags', f.tags
+    )
+  FROM flock_cameras f
+  WHERE f.is_active = TRUE
+    AND ST_DWithin(
+      f.location,
       ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography,
       p_radius_m
     )

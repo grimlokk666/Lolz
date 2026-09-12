@@ -8,6 +8,7 @@ import {
   Video,
   Activity,
   Satellite,
+  Scan,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMasterEyeStore } from "@/lib/store";
@@ -22,6 +23,7 @@ const LAYER_META: {
   { id: "aircraft", label: "Aircraft", icon: <Plane className="h-3.5 w-3.5" /> },
   { id: "webcams", label: "Webcams", icon: <Video className="h-3.5 w-3.5" /> },
   { id: "audio", label: "Audio", icon: <Radio className="h-3.5 w-3.5" /> },
+  { id: "flock", label: "Flock ALPR", icon: <Scan className="h-3.5 w-3.5" /> },
 ];
 
 export default function HudToolbar() {
@@ -32,6 +34,7 @@ export default function HudToolbar() {
   const globalAircraft = useMasterEyeStore((s) => s.globalAircraft);
   const globalWebcams = useMasterEyeStore((s) => s.globalWebcams);
   const globalAudio = useMasterEyeStore((s) => s.globalAudio);
+  const globalFlock = useMasterEyeStore((s) => s.globalFlock);
 
   return (
     <>
@@ -105,6 +108,10 @@ export default function HudToolbar() {
             <div className="flex justify-between px-1">
               <span>AUDIO</span>
               <span className="text-cyan-400">{globalAudio.length}</span>
+            </div>
+            <div className="flex justify-between px-1">
+              <span>FLOCK</span>
+              <span className="text-amber-400">{globalFlock.length}</span>
             </div>
           </div>
         </div>

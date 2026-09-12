@@ -30,6 +30,7 @@ export default function CommandCenter() {
   const setGlobalWebcams = useMasterEyeStore((s) => s.setGlobalWebcams);
   const setGlobalAudio = useMasterEyeStore((s) => s.setGlobalAudio);
   const setGlobalAircraft = useMasterEyeStore((s) => s.setGlobalAircraft);
+  const setGlobalFlock = useMasterEyeStore((s) => s.setGlobalFlock);
   const setStatusMessage = useMasterEyeStore((s) => s.setStatusMessage);
   const tickClock = useMasterEyeStore((s) => s.tickClock);
   const trackAircraft = useMasterEyeStore((s) => s.trackAircraft);
@@ -37,8 +38,8 @@ export default function CommandCenter() {
   const globalWebcams = useMasterEyeStore((s) => s.globalWebcams);
   const globalAudio = useMasterEyeStore((s) => s.globalAudio);
   const globalAircraft = useMasterEyeStore((s) => s.globalAircraft);
+  const globalFlock = useMasterEyeStore((s) => s.globalFlock);
 
-  // Clock + global layer bootstrap
   useEffect(() => {
     const clockId = window.setInterval(tickClock, 1000);
     return () => window.clearInterval(clockId);
@@ -49,10 +50,11 @@ export default function CommandCenter() {
 
     async function loadLayers() {
       try {
-        const [camsRes, audioRes, airRes] = await Promise.all([
+        const [camsRes, audioRes, airRes, flockRes] = await Promise.all([
           fetch("/api/webcams"),
           fetch("/api/audio-feeds"),
           fetch(`/api/airspace?lamin=24&lamax=50&lomin=-125&lomax=-66`),
+          fetch("/api/flock"),
         ]);
 
         const parseJson = async (res: Response, label: string) => {
@@ -70,13 +72,15 @@ export default function CommandCenter() {
         const cams = await parseJson(camsRes, "webcams");
         const audio = await parseJson(audioRes, "audio");
         const air = await parseJson(airRes, "airspace");
+        const flock = await parseJson(flockRes, "flock");
 
         if (cancelled) return;
         setGlobalWebcams(cams.webcams ?? []);
         setGlobalAudio(audio.feeds ?? []);
         setGlobalAircraft(air.aircraft ?? []);
+        setGlobalFlock(flock.cameras ?? []);
         setStatusMessage(
-          `OVERWATCH READY // ${cams.count ?? 0} CAMS · ${audio.count ?? 0} AUDIO · ${air.count ?? 0} ACFT (${air.source ?? "n/a"})`
+          `OVERWATCH READY // ${cams.count ?? 0} CAMS · ${audio.count ?? 0} AUDIO · ${air.count ?? 0} ACFT · ${flock.count ?? 0} FLOCK (${flock.source ?? "n/a"})`
         );
       } catch (err) {
         if (!cancelled) {
@@ -96,6 +100,7 @@ export default function CommandCenter() {
   }, [
     setGlobalAircraft,
     setGlobalAudio,
+    setGlobalFlock,
     setGlobalWebcams,
     setStatusMessage,
   ]);
@@ -104,7 +109,10 @@ export default function CommandCenter() {
     async (
       lat: number,
       lon: number,
-      meta?: { entityId?: string; entityType?: "aircraft" | "webcam" | "audio" }
+      meta?: {
+        entityId?: string;
+        entityType?: "aircraft" | "webcam" | "audio" | "flock";
+      }
     ) => {
       openInspection({
         latitude: lat,
@@ -135,12 +143,16 @@ export default function CommandCenter() {
           webcams: data.webcams ?? [],
           audioFeeds: data.audioFeeds ?? [],
           aircraft: data.aircraft ?? [],
+          flockCameras: data.flockCameras ?? [],
           queriedAt: data.queriedAt,
         };
         setInspection(inspection);
         setGlobalAircraft(data.aircraft ?? []);
+        if (data.flockCameras?.length) {
+          setGlobalFlock(data.flockCameras);
+        }
         setStatusMessage(
-          `SECTOR RESOLVED // ${inspection.webcams.length} CAM · ${inspection.aircraft.length} ACFT · ${inspection.audioFeeds.length} AUDIO`
+          `SECTOR RESOLVED // ${inspection.webcams.length} CAM · ${inspection.aircraft.length} ACFT · ${inspection.audioFeeds.length} AUDIO · ${inspection.flockCameras.length} FLOCK`
         );
       } catch (err) {
         setInspectionError(
@@ -151,6 +163,7 @@ export default function CommandCenter() {
     [
       openInspection,
       setGlobalAircraft,
+      setGlobalFlock,
       setInspection,
       setInspectionError,
       setInspectionLoading,
@@ -159,7 +172,6 @@ export default function CommandCenter() {
     ]
   );
 
-  // Bootstrap over NYC corridor so first sector has tangible assets
   useEffect(() => {
     const t = window.setTimeout(() => {
       void runInspection(40.7128, -74.006);
@@ -169,7 +181,6 @@ export default function CommandCenter() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#030712]">
-      {/* Atmospheric vignette */}
       <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(3,7,18,0.65)_100%)]" />
       <div className="pointer-events-none absolute inset-0 z-20 opacity-[0.07] mix-blend-overlay [background-image:repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(34,211,238,0.15)_3px)]" />
 
@@ -178,6 +189,7 @@ export default function CommandCenter() {
           webcams={globalWebcams}
           audioFeeds={globalAudio}
           aircraft={globalAircraft}
+          flockCameras={globalFlock}
           onInspect={runInspection}
         />
       </ErrorBoundary>

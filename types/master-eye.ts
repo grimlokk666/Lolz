@@ -55,6 +55,28 @@ export interface Aircraft {
   lastContact: number | null;
 }
 
+/** Flock Safety / ALPR camera node (OSM / Overpass / DeFlock-class data) */
+export interface FlockCamera {
+  id: string;
+  osmId: string | null;
+  name: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  operator: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  countryCode: string | null;
+  latitude: number;
+  longitude: number;
+  direction: number | null;
+  surveillanceType: string;
+  source: "overpass" | "osm" | "seed" | "database";
+  tags: string[];
+  distanceM?: number;
+  isActive: boolean;
+}
+
 export interface RegionalInspection {
   latitude: number;
   longitude: number;
@@ -63,20 +85,22 @@ export interface RegionalInspection {
   webcams: WebcamAsset[];
   audioFeeds: AudioFeed[];
   aircraft: Aircraft[];
+  flockCameras: FlockCamera[];
   queriedAt: string;
 }
 
-export type LayerId = "aircraft" | "webcams" | "audio";
+export type LayerId = "aircraft" | "webcams" | "audio" | "flock";
 
 export interface LayerState {
   aircraft: boolean;
   webcams: boolean;
   audio: boolean;
+  flock: boolean;
 }
 
 export interface GlobeClickPayload {
   latitude: number;
   longitude: number;
   entityId?: string;
-  entityType?: "aircraft" | "webcam" | "audio";
+  entityType?: "aircraft" | "webcam" | "audio" | "flock";
 }

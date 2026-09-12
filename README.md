@@ -11,7 +11,7 @@ Real-time tactical global intelligence and surveillance dashboard. CesiumJS glob
 | API | Next.js Route Handlers (`/api/airspace`, `/api/audio-proxy`, `/api/region`, …) |
 | DB | PostgreSQL + PostGIS |
 | Telemetry bridge | Express + WebSocket (`services/telemetry`) |
-| OSINT worker | Python + Shodan (`workers/webcam_discovery.py`) |
+| OSINT workers | Python Shodan webcam discovery + Flock/ALPR Overpass ingest (`workers/`) |
 
 ## Quick start
 

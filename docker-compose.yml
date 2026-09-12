@@ -51,5 +51,21 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+
+  flock-worker:
+    build:
+      context: ./workers
+      dockerfile: Dockerfile
+    container_name: master-eye-flock-worker
+    command: ["python", "flock_discovery.py"]
+    environment:
+      DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-600}
+      WORKER_DEMO_MODE: ${WORKER_DEMO_MODE:-true}
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgis_data:

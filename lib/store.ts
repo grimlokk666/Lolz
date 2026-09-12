@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type {
   Aircraft,
   AudioFeed,
+  FlockCamera,
   GlobeClickPayload,
   LayerState,
   RegionalInspection,
@@ -22,6 +23,7 @@ interface MasterEyeState {
   globalWebcams: WebcamAsset[];
   globalAudio: AudioFeed[];
   globalAircraft: Aircraft[];
+  globalFlock: FlockCamera[];
   statusMessage: string;
   clock: string;
   setLayer: (id: keyof LayerState, enabled: boolean) => void;
@@ -37,12 +39,13 @@ interface MasterEyeState {
   setGlobalWebcams: (cams: WebcamAsset[]) => void;
   setGlobalAudio: (feeds: AudioFeed[]) => void;
   setGlobalAircraft: (aircraft: Aircraft[]) => void;
+  setGlobalFlock: (cameras: FlockCamera[]) => void;
   setStatusMessage: (msg: string) => void;
   tickClock: () => void;
 }
 
 export const useMasterEyeStore = create<MasterEyeState>((set) => ({
-  layers: { aircraft: true, webcams: true, audio: true },
+  layers: { aircraft: true, webcams: true, audio: true, flock: true },
   inspectorOpen: false,
   inspection: null,
   inspectionLoading: false,
@@ -53,6 +56,7 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   globalWebcams: [],
   globalAudio: [],
   globalAircraft: [],
+  globalFlock: [],
   statusMessage: "SYSTEM ONLINE — AWAITING COORDINATE LOCK",
   clock: "",
   setLayer: (id, enabled) =>
@@ -89,11 +93,11 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   setGlobalWebcams: (cams) => set({ globalWebcams: cams }),
   setGlobalAudio: (feeds) => set({ globalAudio: feeds }),
   setGlobalAircraft: (aircraft) => set({ globalAircraft: aircraft }),
+  setGlobalFlock: (cameras) => set({ globalFlock: cameras }),
   setStatusMessage: (msg) => set({ statusMessage: msg }),
   tickClock: () => set({ clock: new Date().toISOString() }),
 }));
 
-// Avoid SSR/client mismatch: seed clock only on client
 if (typeof window !== "undefined") {
   useMasterEyeStore.setState({ clock: new Date().toISOString() });
 }

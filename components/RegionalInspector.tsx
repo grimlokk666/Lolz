@@ -10,6 +10,7 @@ import {
   Search,
   Lock,
   MapPin,
+  Scan,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -120,6 +121,10 @@ export default function RegionalInspector() {
             <TabsTrigger value="audio" type="button">
               <Radio className="mr-1 h-3 w-3" />
               Audio ({inspection.audioFeeds.length})
+            </TabsTrigger>
+            <TabsTrigger value="flock" type="button">
+              <Scan className="mr-1 h-3 w-3" />
+              Flock ({inspection.flockCameras?.length ?? 0})
             </TabsTrigger>
           </TabsList>
 
@@ -308,6 +313,68 @@ export default function RegionalInspector() {
                       <p className="px-0.5 font-mono text-[10px] text-cyan-700">
                         {feed.description}
                       </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="flock" className="min-h-0 flex-1">
+            <ScrollArea className="h-[calc(100vh-9.5rem)]">
+              <div className="space-y-2 p-3">
+                {(inspection.flockCameras?.length ?? 0) === 0 && (
+                  <EmptyState text="No Flock / ALPR nodes in sector radius" />
+                )}
+                {(inspection.flockCameras ?? []).map((cam) => (
+                  <div
+                    key={cam.id}
+                    className="rounded-sm border border-amber-500/30 bg-black/40 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-mono text-[9px] uppercase tracking-widest text-amber-400">
+                          {cam.manufacturer ?? "ALPR"} · {cam.surveillanceType}
+                        </div>
+                        <div className="truncate font-mono text-xs text-cyan-100">
+                          {cam.name ?? cam.model ?? cam.id}
+                        </div>
+                        <div className="mt-1 font-mono text-[10px] text-cyan-600">
+                          {[cam.city, cam.state, cam.countryCode]
+                            .filter(Boolean)
+                            .join(", ") || "Unknown locale"}
+                        </div>
+                        {cam.operator && (
+                          <div className="font-mono text-[10px] text-cyan-700">
+                            OP {cam.operator}
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right font-mono text-[9px] text-amber-500/80">
+                        {cam.distanceM != null
+                          ? `${metersToMiles(cam.distanceM).toFixed(1)} mi`
+                          : cam.source.toUpperCase()}
+                        {cam.direction != null && (
+                          <div>HDG {Math.round(cam.direction)}°</div>
+                        )}
+                      </div>
+                    </div>
+                    {cam.tags?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {cam.tags.slice(0, 6).map((tag) => (
+                          <span
+                            key={tag}
+                            className="border border-amber-500/20 px-1 py-0.5 font-mono text-[9px] uppercase text-amber-600"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {cam.osmId && (
+                      <div className="mt-2 font-mono text-[9px] text-cyan-800">
+                        OSM {cam.osmId}
+                      </div>
                     )}
                   </div>
                 ))}

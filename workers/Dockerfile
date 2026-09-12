@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY webcam_discovery.py .
+COPY webcam_discovery.py flock_discovery.py ./
 
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "webcam_discovery.py"]

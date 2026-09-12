@@ -38,7 +38,7 @@ import {
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { useMasterEyeStore } from "@/lib/store";
-import type { Aircraft, AudioFeed, WebcamAsset } from "@/types/master-eye";
+import type { Aircraft, AudioFeed, FlockCamera, WebcamAsset } from "@/types/master-eye";
 
 if (typeof window !== "undefined") {
   (window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL =
@@ -60,10 +60,14 @@ interface GlobeViewProps {
   webcams: WebcamAsset[];
   audioFeeds: AudioFeed[];
   aircraft: Aircraft[];
+  flockCameras: FlockCamera[];
   onInspect: (
     lat: number,
     lon: number,
-    meta?: { entityId?: string; entityType?: "aircraft" | "webcam" | "audio" }
+    meta?: {
+      entityId?: string;
+      entityType?: "aircraft" | "webcam" | "audio" | "flock";
+    }
   ) => void;
 }
 
@@ -77,6 +81,7 @@ export default function GlobeView({
   webcams,
   audioFeeds,
   aircraft,
+  flockCameras,
   onInspect,
 }: GlobeViewProps) {
   const viewerRef = useRef<CesiumComponentRef<CesiumViewer>>(null);
@@ -363,6 +368,52 @@ export default function GlobeView({
                 outlineWidth={2}
                 style={LabelStyle.FILL_AND_OUTLINE}
                 verticalOrigin={VerticalOrigin.BOTTOM}
+                pixelOffset={new Cartesian2(0, -16)}
+                disableDepthTestDistance={Number.POSITIVE_INFINITY}
+                distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
+                showBackground
+                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
+                  0.75
+                )}
+              />
+            </Entity>
+          ))}
+
+        {ready &&
+          layers.flock &&
+          flockCameras.map((cam) => (
+            <Entity
+              key={`flock-${cam.id}`}
+              name={cam.name ?? cam.manufacturer ?? "ALPR"}
+              position={Cartesian3.fromDegrees(
+                cam.longitude,
+                cam.latitude,
+                350
+              )}
+              properties={{
+                latitude: cam.latitude,
+                longitude: cam.longitude,
+                entityType: "flock",
+                entityId: cam.id,
+              }}
+            >
+              <PointGraphics
+                pixelSize={11}
+                color={Color.fromCssColorString("#f59e0b").withAlpha(0.95)}
+                outlineColor={Color.fromCssColorString("#78350f")}
+                outlineWidth={2}
+                scaleByDistance={new NearFarScalar(1.5e2, 1.35, 1.5e7, 0.4)}
+                distanceDisplayCondition={new DistanceDisplayCondition(0, 2.5e7)}
+              />
+              <LabelGraphics
+                text="FLOCK"
+                font="10px monospace"
+                fillColor={Color.fromCssColorString("#fcd34d")}
+                outlineColor={Color.BLACK}
+                outlineWidth={2}
+                style={LabelStyle.FILL_AND_OUTLINE}
+                verticalOrigin={VerticalOrigin.BOTTOM}
+                horizontalOrigin={HorizontalOrigin.CENTER}
                 pixelOffset={new Cartesian2(0, -16)}
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
                 distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
