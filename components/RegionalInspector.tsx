@@ -39,10 +39,12 @@ export default function RegionalInspector() {
 
   const [airQuery, setAirQuery] = useState("");
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
+  const [tab, setTab] = useState("cams");
 
   useEffect(() => {
     setAirQuery("");
     setImgErrors({});
+    setTab("cams");
   }, [inspection?.queriedAt]);
 
   const filteredAircraft = useMemo(() => {
@@ -101,17 +103,21 @@ export default function RegionalInspector() {
       )}
 
       {inspection && !inspectionLoading && (
-        <Tabs defaultValue="cams" className="flex min-h-0 flex-1 flex-col">
-          <TabsList>
-            <TabsTrigger value="cams">
+        <Tabs
+          value={tab}
+          onValueChange={setTab}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <TabsList className="relative z-20 shrink-0">
+            <TabsTrigger value="cams" type="button">
               <Video className="mr-1 h-3 w-3" />
               Cams ({inspection.webcams.length})
             </TabsTrigger>
-            <TabsTrigger value="air">
+            <TabsTrigger value="air" type="button">
               <Plane className="mr-1 h-3 w-3" />
               Air ({inspection.aircraft.length})
             </TabsTrigger>
-            <TabsTrigger value="audio">
+            <TabsTrigger value="audio" type="button">
               <Radio className="mr-1 h-3 w-3" />
               Audio ({inspection.audioFeeds.length})
             </TabsTrigger>

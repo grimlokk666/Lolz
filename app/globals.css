@@ -45,6 +45,12 @@ h2,
 .cesium-widget canvas {
   width: 100% !important;
   height: 100% !important;
+  z-index: 0 !important;
+  position: relative;
+}
+
+.cesium-widget canvas {
+  outline: none;
 }
 
 /* Custom scrollbars for tactical panels */

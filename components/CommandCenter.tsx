@@ -159,6 +159,14 @@ export default function CommandCenter() {
     ]
   );
 
+  // Bootstrap over NYC corridor so first sector has tangible assets
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void runInspection(40.7128, -74.006);
+    }, 2500);
+    return () => window.clearTimeout(t);
+  }, [runInspection]);
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#030712]">
       {/* Atmospheric vignette */}
