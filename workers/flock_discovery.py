@@ -94,24 +94,66 @@ def fetch_bbox(bbox: Tuple[float, float, float, float]) -> List[Dict[str, Any]]:
     return []
 
 
+_CARDINAL = {
+    "n": 0,
+    "north": 0,
+    "ne": 45,
+    "northeast": 45,
+    "e": 90,
+    "east": 90,
+    "se": 135,
+    "southeast": 135,
+    "s": 180,
+    "south": 180,
+    "sw": 225,
+    "southwest": 225,
+    "w": 270,
+    "west": 270,
+    "nw": 315,
+    "northwest": 315,
+}
+
+
+def parse_direction(raw: Optional[str]) -> Optional[float]:
+    if not raw:
+        return None
+    text = raw.strip()
+    try:
+        return float(text) % 360.0
+    except ValueError:
+        pass
+    key = text.lower().replace("facing ", "").replace(" ", "")
+    key = "".join(ch for ch in key if ch.isalpha())
+    return float(_CARDINAL[key]) if key in _CARDINAL else None
+
+
 def normalize(el: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     lat, lon = el.get("lat"), el.get("lon")
     if lat is None or lon is None:
         return None
     tags = el.get("tags") or {}
-    mfr = tags.get("manufacturer") or tags.get("brand") or "Unknown ALPR"
+    # Never infer Flock from wikidata alone.
+    mfr_raw = tags.get("manufacturer") or tags.get("brand")
+    hay = " ".join(
+        filter(
+            None,
+            [
+                mfr_raw,
+                tags.get("operator"),
+                tags.get("owner"),
+                tags.get("name"),
+                tags.get("brand"),
+            ],
+        )
+    )
+    is_flock = "flock" in hay.lower()
+    mfr = mfr_raw or ("Flock Safety" if is_flock else "ALPR Node")
     tag_list = ["alpr"]
-    if "flock" in mfr.lower() or "flock" in (tags.get("operator") or "").lower():
+    if is_flock:
         tag_list.append("flock")
     for k in ("surveillance:type", "model", "operator", "direction"):
         if tags.get(k):
             tag_list.append(f"{k}={tags[k]}")
-    direction = None
-    if tags.get("direction"):
-        try:
-            direction = float(tags["direction"])
-        except ValueError:
-            pass
     return {
         "osm_id": str(el.get("id")),
         "name": tags.get("name") or tags.get("ref"),
@@ -124,7 +166,7 @@ def normalize(el: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "country_code": "US",
         "latitude": float(lat),
         "longitude": float(lon),
-        "direction": direction,
+        "direction": parse_direction(tags.get("direction")),
         "surveillance_type": (tags.get("surveillance:type") or "ALPR").upper(),
         "tags": tag_list[:12],
         "raw_tags": json.dumps(tags),

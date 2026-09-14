@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HudToolbar from "@/components/HudToolbar";
 import RegionalInspector from "@/components/RegionalInspector";
 import { useMasterEyeStore } from "@/lib/store";
+import { mergeFlockCameras } from "@/lib/flock";
 import type { RegionalInspection } from "@/types/master-eye";
 import { milesToMeters } from "@/lib/utils";
 
@@ -39,6 +40,10 @@ export default function CommandCenter() {
   const globalAudio = useMasterEyeStore((s) => s.globalAudio);
   const globalAircraft = useMasterEyeStore((s) => s.globalAircraft);
   const globalFlock = useMasterEyeStore((s) => s.globalFlock);
+
+  const inspectAbortRef = useRef<AbortController | null>(null);
+  const userInspectedRef = useRef(false);
+  const bootInspectFiredRef = useRef(false);
 
   useEffect(() => {
     const clockId = window.setInterval(tickClock, 1000);
@@ -78,7 +83,12 @@ export default function CommandCenter() {
         setGlobalWebcams(cams.webcams ?? []);
         setGlobalAudio(audio.feeds ?? []);
         setGlobalAircraft(air.aircraft ?? []);
-        setGlobalFlock(flock.cameras ?? []);
+        setGlobalFlock(
+          mergeFlockCameras(
+            useMasterEyeStore.getState().globalFlock,
+            flock.cameras ?? []
+          )
+        );
         setStatusMessage(
           `OVERWATCH READY // ${cams.count ?? 0} CAMS · ${audio.count ?? 0} AUDIO · ${air.count ?? 0} ACFT · ${flock.count ?? 0} FLOCK (${flock.source ?? "n/a"})`
         );
@@ -112,8 +122,17 @@ export default function CommandCenter() {
       meta?: {
         entityId?: string;
         entityType?: "aircraft" | "webcam" | "audio" | "flock";
+        fromUser?: boolean;
       }
     ) => {
+      if (meta?.fromUser) {
+        userInspectedRef.current = true;
+      }
+
+      inspectAbortRef.current?.abort();
+      const ac = new AbortController();
+      inspectAbortRef.current = ac;
+
       openInspection({
         latitude: lat,
         longitude: lon,
@@ -129,9 +148,11 @@ export default function CommandCenter() {
 
       try {
         const res = await fetch(
-          `/api/region?lat=${lat}&lon=${lon}&radiusMiles=${DEFAULT_RADIUS}`
+          `/api/region?lat=${lat}&lon=${lon}&radiusMiles=${DEFAULT_RADIUS}`,
+          { signal: ac.signal }
         );
         const data = await res.json();
+        if (ac.signal.aborted) return;
         if (!res.ok) {
           throw new Error(data.error || "Regional inspection failed");
         }
@@ -147,14 +168,23 @@ export default function CommandCenter() {
           queriedAt: data.queriedAt,
         };
         setInspection(inspection);
-        setGlobalAircraft(data.aircraft ?? []);
-        if (data.flockCameras?.length) {
-          setGlobalFlock(data.flockCameras);
+
+        // Enrich globe Flock layer — never replace the global catalog with a sector slice.
+        if (inspection.flockCameras.length > 0) {
+          setGlobalFlock(
+            mergeFlockCameras(
+              useMasterEyeStore.getState().globalFlock,
+              inspection.flockCameras
+            )
+          );
         }
+
+        const flockSrc = data.sources?.flock ?? "n/a";
         setStatusMessage(
-          `SECTOR RESOLVED // ${inspection.webcams.length} CAM · ${inspection.aircraft.length} ACFT · ${inspection.audioFeeds.length} AUDIO · ${inspection.flockCameras.length} FLOCK`
+          `SECTOR RESOLVED // ${inspection.webcams.length} CAM · ${inspection.aircraft.length} ACFT · ${inspection.audioFeeds.length} AUDIO · ${inspection.flockCameras.length} FLOCK (${flockSrc})`
         );
       } catch (err) {
+        if (ac.signal.aborted) return;
         setInspectionError(
           err instanceof Error ? err.message : "Inspection failed"
         );
@@ -162,7 +192,6 @@ export default function CommandCenter() {
     },
     [
       openInspection,
-      setGlobalAircraft,
       setGlobalFlock,
       setInspection,
       setInspectionError,
@@ -172,11 +201,31 @@ export default function CommandCenter() {
     ]
   );
 
+  const handleInspect = useCallback(
+    (
+      lat: number,
+      lon: number,
+      meta?: {
+        entityId?: string;
+        entityType?: "aircraft" | "webcam" | "audio" | "flock";
+      }
+    ) => {
+      void runInspection(lat, lon, { ...meta, fromUser: true });
+    },
+    [runInspection]
+  );
+
+  // Soft demo focus: NYC once, skipped if the operator already clicked the globe.
   useEffect(() => {
     const t = window.setTimeout(() => {
+      if (bootInspectFiredRef.current || userInspectedRef.current) return;
+      bootInspectFiredRef.current = true;
       void runInspection(40.7128, -74.006);
-    }, 2500);
-    return () => window.clearTimeout(t);
+    }, 2800);
+    return () => {
+      window.clearTimeout(t);
+      inspectAbortRef.current?.abort();
+    };
   }, [runInspection]);
 
   return (
@@ -190,7 +239,7 @@ export default function CommandCenter() {
           audioFeeds={globalAudio}
           aircraft={globalAircraft}
           flockCameras={globalFlock}
-          onInspect={runInspection}
+          onInspect={handleInspect}
         />
       </ErrorBoundary>
 

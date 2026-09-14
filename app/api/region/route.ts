@@ -209,8 +209,9 @@ export async function GET(request: Request) {
       flockCameras = filterByRadius(FALLBACK_FLOCK, lat, lon, radiusMeters);
     }
 
-    // Live Overpass enrichment for Flock / ALPR when DB is sparse
-    if (flockCameras.length < 3) {
+    // Live Overpass enrichment when DB/seed is sparse. Prefer local data first;
+    // Overpass is best-effort with TTL cache inside fetchFlockFromOverpass.
+    if (flockCameras.length < 5) {
       try {
         const live = await fetchFlockFromOverpass({
           lat,
@@ -225,7 +226,10 @@ export async function GET(request: Request) {
           flockCameras = Array.from(byKey.values()).sort(
             (a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0)
           );
-          flockSource = live.source;
+          flockSource =
+            flockSource === "fallback" || flockSource.includes("empty")
+              ? live.source
+              : `${flockSource}+${live.source}`;
         }
       } catch {
         if (flockCameras.length === 0) {

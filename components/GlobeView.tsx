@@ -200,6 +200,7 @@ export default function GlobeView({
               | "aircraft"
               | "webcam"
               | "audio"
+              | "flock"
               | undefined,
           });
           return;
