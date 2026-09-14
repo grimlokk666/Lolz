@@ -56,4 +56,4 @@ Dark tactical HUD: obsidian `#030712`, cyan borders, glassmorphism panels (`back
 
 ## Environment
 
-See `.env.example` for `DATABASE_URL`, `SHODAN_API_KEY`, `NEXT_PUBLIC_CESIUM_ION_TOKEN`, OpenSky credentials, and ADS-B RapidAPI keys.
+See `.env.example` for `DATABASE_URL`, `SHODAN_API_KEY`, `NEXT_PUBLIC_CESIUM_ION_TOKEN`, OpenSky OAuth (`OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` from your OpenSky `credentials.json`), and ADS-B RapidAPI keys.

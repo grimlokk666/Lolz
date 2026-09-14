@@ -1,4 +1,5 @@
 import type { Aircraft } from "@/types/master-eye";
+import { getOpenSkyAuthHeaders } from "@/lib/opensky-auth";
 import { bboxFromCenter } from "@/lib/utils";
 import { generateDemoAircraft } from "@/lib/fallback-data";
 
@@ -72,12 +73,7 @@ export async function fetchAirspace(params: {
     if (lomin != null) qs.set("lomin", String(lomin));
     if (lomax != null) qs.set("lomax", String(lomax));
 
-    const headers: HeadersInit = { Accept: "application/json" };
-    const user = process.env.OPENSKY_USERNAME;
-    const pass = process.env.OPENSKY_PASSWORD;
-    if (user && pass) {
-      headers.Authorization = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
-    }
+    const headers = await getOpenSkyAuthHeaders();
 
     const res = await fetch(
       `https://opensky-network.org/api/states/all?${qs.toString()}`,

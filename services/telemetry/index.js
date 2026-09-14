@@ -30,6 +30,42 @@ let lastAircraft = [];
 let lastSource = "idle";
 let lastPollAt = null;
 
+let cachedToken = null;
+let tokenExpiresAt = 0;
+
+async function getOpenSkyBearer() {
+  const clientId = (process.env.OPENSKY_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.OPENSKY_CLIENT_SECRET || "").trim();
+  if (!clientId || !clientSecret) return null;
+
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiresAt - 60_000) return cachedToken;
+
+  const params = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+  const res = await axios.post(
+    "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token",
+    params.toString(),
+    {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 10000,
+    }
+  );
+  cachedToken = res.data.access_token;
+  tokenExpiresAt = now + (res.data.expires_in || 1800) * 1000;
+  return cachedToken;
+}
+
+async function openskyHeaders() {
+  const headers = { Accept: "application/json" };
+  const token = await getOpenSkyBearer();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 function mapOpenSkyStates(states) {
   if (!Array.isArray(states)) return [];
   const out = [];
@@ -56,13 +92,7 @@ function mapOpenSkyStates(states) {
 }
 
 async function pollOpenSky() {
-  const headers = { Accept: "application/json" };
-  if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
-    const token = Buffer.from(
-      `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
-    ).toString("base64");
-    headers.Authorization = `Basic ${token}`;
-  }
+  const headers = await openskyHeaders();
 
   // CONUS-focused default bbox for bridge density; clients can request regions via HTTP
   const url =
@@ -175,12 +205,7 @@ app.get("/airspace", async (req, res) => {
   try {
     const { lamin, lamax, lomin, lomax } = req.query;
     if (lamin && lamax && lomin && lomax) {
-      const headers = { Accept: "application/json" };
-      if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
-        headers.Authorization = `Basic ${Buffer.from(
-          `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
-        ).toString("base64")}`;
-      }
+      const headers = await openskyHeaders();
       const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
       const upstream = await axios.get(url, { headers, timeout: 12000 });
       const aircraft = mapOpenSkyStates(upstream.data?.states);
