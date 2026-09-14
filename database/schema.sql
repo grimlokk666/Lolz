@@ -133,6 +133,10 @@ CREATE TABLE IF NOT EXISTS inspection_events (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Retention helper index; API prunes rows older than 7 days on write.
+CREATE INDEX IF NOT EXISTS inspection_events_created_at_idx
+  ON inspection_events (created_at);
+
 -- Spatial query helper: assets within radius (meters)
 CREATE OR REPLACE FUNCTION assets_within_radius(
   p_lat DOUBLE PRECISION,

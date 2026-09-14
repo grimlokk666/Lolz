@@ -25,6 +25,7 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 const CACHE_TTL_MS = 5 * 60_000;
+const CACHE_MAX_ENTRIES = 64;
 const overpassCache = new Map<string, CacheEntry>();
 
 const CARDINAL_HDG: Record<string, number> = {
@@ -51,13 +52,18 @@ function bboxFromCenter(
   lon: number,
   radiusMeters: number
 ): { south: number; west: number; north: number; east: number } {
+  const safeLat = Math.max(-89.9, Math.min(89.9, lat));
   const dLat = radiusMeters / 111_320;
-  const dLon = radiusMeters / (111_320 * Math.cos((lat * Math.PI) / 180));
+  const cosLat = Math.cos((safeLat * Math.PI) / 180);
+  const dLon =
+    Math.abs(cosLat) < 1e-6
+      ? 180
+      : radiusMeters / (111_320 * Math.abs(cosLat));
   return {
-    south: lat - dLat,
-    north: lat + dLat,
-    west: lon - dLon,
-    east: lon + dLon,
+    south: Math.max(-90, safeLat - dLat),
+    north: Math.min(90, safeLat + dLat),
+    west: Math.max(-180, lon - dLon),
+    east: Math.min(180, lon + dLon),
   };
 }
 
@@ -81,6 +87,15 @@ function readCache(key: string): CacheEntry | null {
 
 function writeCache(key: string, cameras: FlockCamera[], source: string) {
   overpassCache.set(key, { at: Date.now(), cameras, source });
+  if (overpassCache.size > CACHE_MAX_ENTRIES) {
+    const ordered = Array.from(overpassCache.entries()).sort(
+      (a, b) => a[1].at - b[1].at
+    );
+    const drop = ordered.length - CACHE_MAX_ENTRIES;
+    for (let i = 0; i < drop; i++) {
+      overpassCache.delete(ordered[i][0]);
+    }
+  }
 }
 
 /** Parse OSM direction tags: degrees, cardinals, or "facing south". */
@@ -289,7 +304,8 @@ export async function fetchFlockBboxFromOverpass(params: {
 /** Merge catalogs by id without dropping existing globe coverage. */
 export function mergeFlockCameras(
   base: FlockCamera[],
-  incoming: FlockCamera[]
+  incoming: FlockCamera[],
+  maxEntries = 2500
 ): FlockCamera[] {
   const byId = new Map<string, FlockCamera>();
   for (const cam of base) byId.set(cam.id, cam);
@@ -297,5 +313,10 @@ export function mergeFlockCameras(
     const prev = byId.get(cam.id);
     byId.set(cam.id, prev ? { ...prev, ...cam } : cam);
   }
-  return Array.from(byId.values());
+  const merged = Array.from(byId.values());
+  if (merged.length <= maxEntries) return merged;
+  // Prefer recently enriched / closer nodes when capping growth.
+  return merged
+    .sort((a, b) => (a.distanceM ?? 1e12) - (b.distanceM ?? 1e12))
+    .slice(0, maxEntries);
 }

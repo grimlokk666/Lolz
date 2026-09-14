@@ -38,6 +38,7 @@ import {
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { useMasterEyeStore } from "@/lib/store";
+import { isEmergencySquawk } from "@/lib/utils";
 import type { Aircraft, AudioFeed, FlockCamera, WebcamAsset } from "@/types/master-eye";
 
 if (typeof window !== "undefined") {
@@ -242,8 +243,14 @@ export default function GlobeView({
     return () => {
       window.clearInterval(id);
       cleanup?.();
+      // Allow re-init after Strict Mode remount / ErrorBoundary reset
+      initDoneRef.current = false;
     };
   }, [handleViewerReady]);
+
+  const trackedKey = tracked
+    ? `${tracked.icao24}:${tracked.latitude.toFixed(3)}:${tracked.longitude.toFixed(3)}`
+    : null;
 
   useEffect(() => {
     const viewer = viewerRef.current?.cesiumElement;
@@ -261,7 +268,8 @@ export default function GlobeView({
       },
       duration: 1.2,
     });
-  }, [tracked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by coarse position to avoid poll thrash
+  }, [trackedKey]);
 
   const handleFlyComplete = useCallback(() => {
     setFlyToTarget(null);
@@ -447,9 +455,11 @@ export default function GlobeView({
               <PointGraphics
                 pixelSize={trackedAircraftId === ac.icao24 ? 16 : 9}
                 color={
-                  trackedAircraftId === ac.icao24
-                    ? Color.fromCssColorString("#fbbf24")
-                    : headingToColor(ac.heading)
+                  isEmergencySquawk(ac.squawk)
+                    ? Color.fromCssColorString("#f87171")
+                    : trackedAircraftId === ac.icao24
+                      ? Color.fromCssColorString("#fbbf24")
+                      : headingToColor(ac.heading)
                 }
                 outlineColor={Color.BLACK}
                 outlineWidth={1}

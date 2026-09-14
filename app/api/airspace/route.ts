@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { aircraftToGeoJSON, fetchAirspace } from "@/lib/airspace";
-import { milesToMeters } from "@/lib/utils";
+import {
+  clampLat,
+  clampLon,
+  clampRadiusMiles,
+  milesToMeters,
+} from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,14 +26,17 @@ export async function GET(request: Request) {
     );
     const format = searchParams.get("format") ?? "json";
 
+    const clampBox = (v: number | undefined, min: number, max: number) =>
+      v == null || !Number.isFinite(v) ? undefined : Math.max(min, Math.min(max, v));
+
     const result = await fetchAirspace({
-      lat: lat != null ? Number(lat) : undefined,
-      lon: lon != null ? Number(lon) : undefined,
-      radiusMeters: milesToMeters(radiusMiles),
-      lamin: lamin != null ? Number(lamin) : undefined,
-      lamax: lamax != null ? Number(lamax) : undefined,
-      lomin: lomin != null ? Number(lomin) : undefined,
-      lomax: lomax != null ? Number(lomax) : undefined,
+      lat: lat != null ? clampLat(Number(lat)) : undefined,
+      lon: lon != null ? clampLon(Number(lon)) : undefined,
+      radiusMeters: milesToMeters(clampRadiusMiles(radiusMiles)),
+      lamin: clampBox(lamin != null ? Number(lamin) : undefined, -90, 90),
+      lamax: clampBox(lamax != null ? Number(lamax) : undefined, -90, 90),
+      lomin: clampBox(lomin != null ? Number(lomin) : undefined, -180, 180),
+      lomax: clampBox(lomax != null ? Number(lomax) : undefined, -180, 180),
     });
 
     if (format === "geojson") {

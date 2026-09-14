@@ -24,6 +24,46 @@ function isAllowedStreamUrl(raw: string): boolean {
   }
 }
 
+/**
+ * Follow redirects manually and re-validate each hop against the host
+ * allowlist — prevents SSRF via allowlisted CDN → internal IP redirects.
+ */
+async function fetchAllowlistedStream(startUrl: string): Promise<Response> {
+  let current = startUrl;
+  for (let hop = 0; hop < 4; hop++) {
+    if (!isAllowedStreamUrl(current)) {
+      throw new Error("Redirect target not allowlisted");
+    }
+
+    const connectAbort = AbortSignal.timeout(12_000);
+    const upstream = await fetch(current, {
+      headers: {
+        "User-Agent": "MASTER-EYE-AudioProxy/1.1",
+        Accept: "*/*",
+        Connection: "keep-alive",
+        "Icy-MetaData": "1",
+      },
+      redirect: "manual",
+      // @ts-expect-error Node fetch duplex not typed in all versions
+      duplex: "half",
+      signal: connectAbort,
+    });
+
+    if ([301, 302, 303, 307, 308].includes(upstream.status)) {
+      const location = upstream.headers.get("location");
+      if (!location) {
+        throw new Error("Redirect without Location header");
+      }
+      current = new URL(location, current).toString();
+      continue;
+    }
+
+    return upstream;
+  }
+
+  throw new Error("Too many redirects");
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const target = searchParams.get("url");
@@ -53,18 +93,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstream = await fetch(decoded, {
-      headers: {
-        "User-Agent": "MASTER-EYE-AudioProxy/1.0",
-        Accept: "*/*",
-        Connection: "keep-alive",
-        "Icy-MetaData": "1",
-      },
-      redirect: "follow",
-      // @ts-expect-error Node fetch duplex not typed in all versions
-      duplex: "half",
-      signal: AbortSignal.timeout(20_000),
-    });
+    // Connect timeout only — do NOT abort the body (Icecast streams are long-lived).
+    const upstream = await fetchAllowlistedStream(decoded);
 
     if (!upstream.ok || !upstream.body) {
       return NextResponse.json(
@@ -86,7 +116,6 @@ export async function GET(request: Request) {
       "Content-Type": contentType,
       "Cache-Control": "no-store, no-cache",
       "Access-Control-Allow-Origin": "*",
-      "Transfer-Encoding": "chunked",
     });
     if (icyName) headers.set("X-Icy-Name", icyName);
     if (icyGenre) headers.set("X-Icy-Genre", icyGenre);

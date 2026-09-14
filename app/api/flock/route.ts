@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { query, isDatabaseAvailable } from "@/lib/db";
 import { FALLBACK_FLOCK, filterByRadius } from "@/lib/fallback-data";
 import { fetchFlockFromOverpass } from "@/lib/flock";
-import { milesToMeters } from "@/lib/utils";
+import {
+  clampLat,
+  clampLon,
+  clampRadiusMiles,
+  milesToMeters,
+} from "@/lib/utils";
 import type { FlockCamera } from "@/types/master-eye";
 
 export const dynamic = "force-dynamic";
@@ -126,16 +131,25 @@ export async function GET(request: Request) {
           { status: 400 }
         );
       }
+      if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        return NextResponse.json(
+          { error: "lat/lon out of range" },
+          { status: 400 }
+        );
+      }
+      const safeLat = clampLat(latitude);
+      const safeLon = clampLon(longitude);
 
-      const radiusMeters = milesToMeters(radiusMiles);
+      const safeRadiusMiles = clampRadiusMiles(radiusMiles);
+      const radiusMeters = milesToMeters(safeRadiusMiles);
       let cameras: FlockCamera[] = [];
       let source = "fallback";
 
       if (live) {
         try {
           const overpass = await fetchFlockFromOverpass({
-            lat: latitude,
-            lon: longitude,
+            lat: safeLat,
+            lon: safeLon,
             radiusMeters,
           });
           cameras = overpass.cameras;

@@ -8,7 +8,12 @@ import {
 } from "@/lib/fallback-data";
 import { fetchAirspace } from "@/lib/airspace";
 import { fetchFlockFromOverpass } from "@/lib/flock";
-import { milesToMeters } from "@/lib/utils";
+import {
+  clampLat,
+  clampLon,
+  clampRadiusMiles,
+  milesToMeters,
+} from "@/lib/utils";
 import type { AudioFeed, FlockCamera, WebcamAsset } from "@/types/master-eye";
 
 export const dynamic = "force-dynamic";
@@ -139,9 +144,9 @@ function mapFlock(row: FlockRow): FlockCamera {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const lat = Number(searchParams.get("lat"));
-    const lon = Number(searchParams.get("lon"));
-    const radiusMiles = Number(
+    let lat = Number(searchParams.get("lat"));
+    let lon = Number(searchParams.get("lon"));
+    let radiusMiles = Number(
       searchParams.get("radiusMiles") ??
         process.env.NEXT_PUBLIC_DEFAULT_RADIUS_MILES ??
         25
@@ -153,7 +158,16 @@ export async function GET(request: Request) {
         { status: 400 }
       );
     }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      return NextResponse.json(
+        { error: "lat/lon out of range" },
+        { status: 400 }
+      );
+    }
 
+    lat = clampLat(lat);
+    lon = clampLon(lon);
+    radiusMiles = clampRadiusMiles(radiusMiles);
     const radiusMeters = milesToMeters(radiusMiles);
     let webcams: WebcamAsset[] = [];
     let audioFeeds: AudioFeed[] = [];
@@ -253,6 +267,9 @@ export async function GET(request: Request) {
             audioFeeds.length,
             flockCameras.length,
           ]
+        );
+        await query(
+          `DELETE FROM inspection_events WHERE created_at < NOW() - INTERVAL '7 days'`
         );
       } catch {
         // non-fatal

@@ -106,7 +106,7 @@ export default function RegionalInspector() {
         </Button>
       </header>
 
-      {inspectionLoading && (
+      {inspectionLoading && !inspection && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <div className="font-mono text-xs uppercase tracking-widest text-cyan-400 animate-pulse">
             Sector sweep in progress
@@ -117,13 +117,19 @@ export default function RegionalInspector() {
         </div>
       )}
 
+      {inspectionLoading && inspection && (
+        <div className="border-b border-cyan-500/20 bg-cyan-950/30 px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-cyan-400 animate-pulse">
+          Re-sweeping sector…
+        </div>
+      )}
+
       {inspectionError && !inspectionLoading && (
         <div className="m-4 border border-red-500/40 bg-red-950/40 p-3 font-mono text-xs text-red-200">
           {inspectionError}
         </div>
       )}
 
-      {inspection && !inspectionLoading && (
+      {inspection && (
         <Tabs
           value={tab}
           onValueChange={setTab}
@@ -255,7 +261,15 @@ export default function RegionalInspector() {
                           "cursor-pointer border-b border-cyan-500/10 transition-colors hover:bg-cyan-500/10",
                           active && "bg-cyan-500/15"
                         )}
-                        onClick={() => selectAircraft(ac.icao24)}
+                        onClick={() => {
+                          selectAircraft(ac.icao24);
+                          setFlyToTarget({
+                            latitude: ac.latitude,
+                            longitude: ac.longitude,
+                            entityId: ac.icao24,
+                            entityType: "aircraft",
+                          });
+                        }}
                       >
                         <td className="px-2 py-2 text-cyan-100">
                           <div>{ac.callsign ?? "————"}</div>
