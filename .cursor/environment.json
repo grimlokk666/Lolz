@@ -1,0 +1,20 @@
+{
+  "name": "MASTER EYE",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "web",
+      "command": "npm run dev",
+      "description": "Next.js dev server (MASTER EYE dashboard) on http://localhost:3000"
+    },
+    {
+      "name": "telemetry",
+      "command": "npm run telemetry",
+      "description": "Express + WebSocket OpenSky telemetry bridge on http://localhost:4100"
+    }
+  ],
+  "ports": [
+    { "name": "web", "port": 3000 },
+    { "name": "telemetry", "port": 4100 }
+  ]
+}
