@@ -15,7 +15,7 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "../../.env.
 require("dotenv").config();
 
 const PORT = Number(process.env.PORT || 4100);
-const POLL_MS = Number(process.env.TELEMETRY_POLL_MS || 15000);
+const POLL_MS = Number(process.env.TELEMETRY_POLL_MS || 30000);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
 const pool = process.env.DATABASE_URL
@@ -94,11 +94,37 @@ function mapOpenSkyStates(states) {
 async function pollOpenSky() {
   const headers = await openskyHeaders();
 
-  // CONUS-focused default bbox for bridge density; clients can request regions via HTTP
-  const url =
-    "https://opensky-network.org/api/states/all?lamin=24&lamax=50&lomin=-125&lomax=-66";
-  const res = await axios.get(url, { headers, timeout: 12000 });
-  return mapOpenSkyStates(res.data?.states);
+  // Credit-aware tiles (≤25 sq° = 1 credit each). Full CONUS costs 4 credits/call
+  // and would burn a standard 4,000/day quota in a few hours at 15s polling.
+  const tiles = (
+    process.env.OPENSKY_BBOXES ||
+    [
+      "40.4,-74.5,41.2,-73.5", // NYC
+      "33.7,-118.7,34.4,-117.8", // LA
+      "41.6,-88.1,42.1,-87.4", // CHI
+      "32.5,-97.5,33.2,-96.5", // DFW
+      "37.5,-122.6,37.9,-121.9", // SFO
+      "25.6,-80.5,26.4,-79.9", // MIA
+    ].join(";")
+  )
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const merged = [];
+  const seen = new Set();
+  for (const tile of tiles) {
+    const [lamin, lomin, lamax, lomax] = tile.split(",").map(Number);
+    if (![lamin, lomin, lamax, lomax].every(Number.isFinite)) continue;
+    const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+    const res = await axios.get(url, { headers, timeout: 12000 });
+    for (const ac of mapOpenSkyStates(res.data?.states)) {
+      if (seen.has(ac.icao24)) continue;
+      seen.add(ac.icao24);
+      merged.push(ac);
+    }
+  }
+  return merged;
 }
 
 function generateDemo(count = 18) {

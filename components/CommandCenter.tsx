@@ -101,7 +101,8 @@ export default function CommandCenter() {
         { key: "audio" as const, url: "/api/audio-feeds" },
         {
           key: "aircraft" as const,
-          url: "/api/airspace?lamin=24&lamax=50&lomin=-125&lomax=-66",
+          // Credit-friendly NE corridor (~1 OpenSky credit). Full CONUS costs 4.
+          url: "/api/airspace?lamin=38&lamax=43&lomin=-80&lomax=-71",
         },
         { key: "flock" as const, url: "/api/flock" },
       ];
