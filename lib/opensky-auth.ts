@@ -35,30 +35,41 @@ export async function getOpenSkyAccessToken(): Promise<string | null> {
     client_secret: clientSecret,
   });
 
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-    signal: AbortSignal.timeout(10_000),
-    cache: "no-store",
-  });
+  try {
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `OpenSky token request failed (${res.status}): ${text.slice(0, 200)}`
+    if (!res.ok) {
+      // Fail open to anonymous OpenSky (lower rate limits) rather than
+      // disabling the entire airspace layer when OAuth misconfigured.
+      console.warn(
+        `[opensky-auth] token request failed (${res.status}); falling back to anonymous`
+      );
+      return null;
+    }
+
+    const data = (await res.json()) as {
+      access_token?: string;
+      expires_in?: number;
+    };
+    if (!data.access_token) {
+      console.warn("[opensky-auth] token response missing access_token");
+      return null;
+    }
+
+    cachedToken = data.access_token;
+    expiresAtMs = now + (data.expires_in ?? 1800) * 1000;
+    return cachedToken;
+  } catch (err) {
+    console.warn(
+      "[opensky-auth] token fetch error; falling back to anonymous",
+      err instanceof Error ? err.message : err
     );
+    return null;
   }
-
-  const data = (await res.json()) as {
-    access_token?: string;
-    expires_in?: number;
-  };
-  if (!data.access_token) {
-    throw new Error("OpenSky token response missing access_token");
-  }
-
-  cachedToken = data.access_token;
-  expiresAtMs = now + (data.expires_in ?? 1800) * 1000;
-  return cachedToken;
 }

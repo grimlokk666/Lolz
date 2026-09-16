@@ -78,6 +78,31 @@ function headingToColor(heading: number | null): Color {
   return Color.fromHsl(0.5 + t * 0.15, 0.9, 0.55);
 }
 
+// Module-level Cesium graphics — avoid allocating per-entity on every render
+const CAM_NEAR_FAR = new NearFarScalar(1.5e2, 1.4, 1.5e7, 0.4);
+const AUDIO_NEAR_FAR = new NearFarScalar(1.5e2, 1.3, 1.5e7, 0.35);
+const FLOCK_NEAR_FAR = new NearFarScalar(1.5e2, 1.35, 1.5e7, 0.4);
+const LABEL_NEAR_FAR = new DistanceDisplayCondition(0, 3e6);
+const POINT_NEAR_FAR = new DistanceDisplayCondition(0, 2.5e7);
+const AC_LABEL_NEAR_FAR = new DistanceDisplayCondition(0, 2.5e6);
+const LABEL_OFFSET = new Cartesian2(0, -18);
+const LABEL_OFFSET_SM = new Cartesian2(0, -16);
+const AC_LABEL_OFFSET = new Cartesian2(0, -14);
+const CYAN = Color.fromCssColorString("#22d3ee").withAlpha(0.95);
+const CYAN_OUTLINE = Color.fromCssColorString("#083344");
+const VIOLET = Color.fromCssColorString("#a78bfa").withAlpha(0.95);
+const VIOLET_OUTLINE = Color.fromCssColorString("#2e1065");
+const AMBER = Color.fromCssColorString("#f59e0b").withAlpha(0.95);
+const AMBER_OUTLINE = Color.fromCssColorString("#78350f");
+const LABEL_BG = Color.fromCssColorString("#030712").withAlpha(0.75);
+const TRACK_GOLD = Color.fromCssColorString("#fbbf24");
+const TRACK_LABEL = Color.fromCssColorString("#fde68a");
+const AC_LABEL = Color.fromCssColorString("#67e8f9");
+const EMERG_RED = Color.fromCssColorString("#f87171");
+const FLOCK_LABEL = Color.fromCssColorString("#fcd34d");
+const AUDIO_LABEL = Color.fromCssColorString("#c4b5fd");
+
+
 export default function GlobeView({
   webcams,
   audioFeeds,
@@ -304,7 +329,7 @@ export default function GlobeView({
 
         {ready &&
           layers.webcams &&
-          webcams.map((cam) => (
+          webcams.slice(0, 300).map((cam) => (
             <Entity
               key={`cam-${cam.id}`}
               name={cam.title ?? cam.ip}
@@ -318,11 +343,11 @@ export default function GlobeView({
             >
               <PointGraphics
                 pixelSize={12}
-                color={Color.fromCssColorString("#22d3ee").withAlpha(0.95)}
-                outlineColor={Color.fromCssColorString("#083344")}
+                color={CYAN}
+                outlineColor={CYAN_OUTLINE}
                 outlineWidth={2}
-                scaleByDistance={new NearFarScalar(1.5e2, 1.4, 1.5e7, 0.4)}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 2.5e7)}
+                scaleByDistance={CAM_NEAR_FAR}
+                distanceDisplayCondition={POINT_NEAR_FAR}
               />
               <LabelGraphics
                 text="CAM"
@@ -333,20 +358,18 @@ export default function GlobeView({
                 style={LabelStyle.FILL_AND_OUTLINE}
                 verticalOrigin={VerticalOrigin.BOTTOM}
                 horizontalOrigin={HorizontalOrigin.CENTER}
-                pixelOffset={new Cartesian2(0, -18)}
+                pixelOffset={LABEL_OFFSET}
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
+                distanceDisplayCondition={LABEL_NEAR_FAR}
                 showBackground
-                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
-                  0.75
-                )}
+                backgroundColor={LABEL_BG}
               />
             </Entity>
           ))}
 
         {ready &&
           layers.audio &&
-          audioFeeds.map((feed) => (
+          audioFeeds.slice(0, 300).map((feed) => (
             <Entity
               key={`audio-${feed.id}`}
               name={feed.name}
@@ -364,33 +387,31 @@ export default function GlobeView({
             >
               <PointGraphics
                 pixelSize={10}
-                color={Color.fromCssColorString("#a78bfa").withAlpha(0.95)}
-                outlineColor={Color.fromCssColorString("#2e1065")}
+                color={VIOLET}
+                outlineColor={VIOLET_OUTLINE}
                 outlineWidth={2}
-                scaleByDistance={new NearFarScalar(1.5e2, 1.3, 1.5e7, 0.35)}
+                scaleByDistance={AUDIO_NEAR_FAR}
               />
               <LabelGraphics
                 text="AUDIO"
                 font="10px monospace"
-                fillColor={Color.fromCssColorString("#c4b5fd")}
+                fillColor={AUDIO_LABEL}
                 outlineColor={Color.BLACK}
                 outlineWidth={2}
                 style={LabelStyle.FILL_AND_OUTLINE}
                 verticalOrigin={VerticalOrigin.BOTTOM}
-                pixelOffset={new Cartesian2(0, -16)}
+                pixelOffset={LABEL_OFFSET_SM}
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
+                distanceDisplayCondition={LABEL_NEAR_FAR}
                 showBackground
-                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
-                  0.75
-                )}
+                backgroundColor={LABEL_BG}
               />
             </Entity>
           ))}
 
         {ready &&
           layers.flock &&
-          flockCameras.map((cam) => (
+          flockCameras.slice(0, 800).map((cam) => (
             <Entity
               key={`flock-${cam.id}`}
               name={cam.name ?? cam.manufacturer ?? "ALPR"}
@@ -408,35 +429,33 @@ export default function GlobeView({
             >
               <PointGraphics
                 pixelSize={11}
-                color={Color.fromCssColorString("#f59e0b").withAlpha(0.95)}
-                outlineColor={Color.fromCssColorString("#78350f")}
+                color={AMBER}
+                outlineColor={AMBER_OUTLINE}
                 outlineWidth={2}
-                scaleByDistance={new NearFarScalar(1.5e2, 1.35, 1.5e7, 0.4)}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 2.5e7)}
+                scaleByDistance={FLOCK_NEAR_FAR}
+                distanceDisplayCondition={POINT_NEAR_FAR}
               />
               <LabelGraphics
                 text="FLOCK"
                 font="10px monospace"
-                fillColor={Color.fromCssColorString("#fcd34d")}
+                fillColor={FLOCK_LABEL}
                 outlineColor={Color.BLACK}
                 outlineWidth={2}
                 style={LabelStyle.FILL_AND_OUTLINE}
                 verticalOrigin={VerticalOrigin.BOTTOM}
                 horizontalOrigin={HorizontalOrigin.CENTER}
-                pixelOffset={new Cartesian2(0, -16)}
+                pixelOffset={LABEL_OFFSET_SM}
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 3e6)}
+                distanceDisplayCondition={LABEL_NEAR_FAR}
                 showBackground
-                backgroundColor={Color.fromCssColorString("#030712").withAlpha(
-                  0.75
-                )}
+                backgroundColor={LABEL_BG}
               />
             </Entity>
           ))}
 
         {ready &&
           layers.aircraft &&
-          aircraft.map((ac) => (
+          aircraft.slice(0, 600).map((ac) => (
             <Entity
               key={`ac-${ac.icao24}`}
               name={ac.callsign ?? ac.icao24}
@@ -456,9 +475,9 @@ export default function GlobeView({
                 pixelSize={trackedAircraftId === ac.icao24 ? 16 : 9}
                 color={
                   isEmergencySquawk(ac.squawk)
-                    ? Color.fromCssColorString("#f87171")
+                    ? EMERG_RED
                     : trackedAircraftId === ac.icao24
-                      ? Color.fromCssColorString("#fbbf24")
+                      ? TRACK_GOLD
                       : headingToColor(ac.heading)
                 }
                 outlineColor={Color.BLACK}
@@ -469,16 +488,16 @@ export default function GlobeView({
                 font="11px monospace"
                 fillColor={
                   trackedAircraftId === ac.icao24
-                    ? Color.fromCssColorString("#fde68a")
-                    : Color.fromCssColorString("#67e8f9")
+                    ? TRACK_LABEL
+                    : AC_LABEL
                 }
                 outlineColor={Color.BLACK}
                 outlineWidth={2}
                 style={LabelStyle.FILL_AND_OUTLINE}
                 verticalOrigin={VerticalOrigin.BOTTOM}
-                pixelOffset={new Cartesian2(0, -14)}
+                pixelOffset={AC_LABEL_OFFSET}
                 disableDepthTestDistance={Number.POSITIVE_INFINITY}
-                distanceDisplayCondition={new DistanceDisplayCondition(0, 2.5e6)}
+                distanceDisplayCondition={AC_LABEL_NEAR_FAR}
               />
             </Entity>
           ))}

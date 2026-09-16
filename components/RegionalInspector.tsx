@@ -169,7 +169,7 @@ export default function RegionalInspector() {
                       {!imgErrors[cam.id] && cam.snapshotUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={cam.streamUrl || cam.snapshotUrl}
+                          src={cam.snapshotUrl || cam.streamUrl || undefined}
                           alt={cam.title ?? cam.ip}
                           className="h-full w-full object-cover opacity-90"
                           onError={() =>
@@ -182,7 +182,7 @@ export default function RegionalInspector() {
                         </div>
                       )}
                       <div className="absolute left-2 top-2 rounded-sm border border-cyan-400/50 bg-black/70 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-cyan-300">
-                        LIVE CAM
+                        CAM FEED
                       </div>
                     </div>
                     <div className="space-y-1 p-2.5">
@@ -284,7 +284,7 @@ export default function RegionalInspector() {
                         <td
                           className={cn(
                             "px-2 py-2",
-                            ac.squawk === "7700" || ac.squawk === "7600"
+                            ac.squawk === "7700" || ac.squawk === "7600" || ac.squawk === "7500"
                               ? "text-red-400"
                               : "text-cyan-300"
                           )}

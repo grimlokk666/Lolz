@@ -301,22 +301,4 @@ export async function fetchFlockBboxFromOverpass(params: {
   }
 }
 
-/** Merge catalogs by id without dropping existing globe coverage. */
-export function mergeFlockCameras(
-  base: FlockCamera[],
-  incoming: FlockCamera[],
-  maxEntries = 2500
-): FlockCamera[] {
-  const byId = new Map<string, FlockCamera>();
-  for (const cam of base) byId.set(cam.id, cam);
-  for (const cam of incoming) {
-    const prev = byId.get(cam.id);
-    byId.set(cam.id, prev ? { ...prev, ...cam } : cam);
-  }
-  const merged = Array.from(byId.values());
-  if (merged.length <= maxEntries) return merged;
-  // Prefer recently enriched / closer nodes when capping growth.
-  return merged
-    .sort((a, b) => (a.distanceM ?? 1e12) - (b.distanceM ?? 1e12))
-    .slice(0, maxEntries);
-}
+export { mergeFlockCameras } from "@/lib/flock-merge";

@@ -8,6 +8,7 @@ import {
 } from "@/lib/fallback-data";
 import { fetchAirspace } from "@/lib/airspace";
 import { fetchFlockFromOverpass } from "@/lib/flock";
+import { mergeFlockCameras } from "@/lib/flock-merge";
 import {
   clampLat,
   clampLon,
@@ -223,64 +224,55 @@ export async function GET(request: Request) {
       flockCameras = filterByRadius(FALLBACK_FLOCK, lat, lon, radiusMeters);
     }
 
-    // Live Overpass enrichment when DB/seed is sparse. Prefer local data first;
-    // Overpass is best-effort with TTL cache inside fetchFlockFromOverpass.
-    if (flockCameras.length < 5) {
-      try {
-        const live = await fetchFlockFromOverpass({
-          lat,
-          lon,
-          radiusMeters,
-        });
-        if (live.cameras.length > 0) {
-          const byKey = new Map<string, FlockCamera>();
-          for (const c of [...flockCameras, ...live.cameras]) {
-            byKey.set(c.osmId ?? c.id, c);
-          }
-          flockCameras = Array.from(byKey.values()).sort(
-            (a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0)
-          );
-          flockSource =
-            flockSource === "fallback" || flockSource.includes("empty")
-              ? live.source
-              : `${flockSource}+${live.source}`;
-        }
-      } catch {
-        if (flockCameras.length === 0) {
-          flockCameras = filterByRadius(FALLBACK_FLOCK, lat, lon, radiusMeters);
-          flockSource = "fallback";
-        }
-      }
+    // Live Overpass enrichment + airspace in parallel so Overpass never
+    // serializes behind the critical sector path alone.
+    const needOverpass = flockCameras.length < 5;
+    const [liveResult, airspace] = await Promise.all([
+      needOverpass
+        ? fetchFlockFromOverpass({ lat, lon, radiusMeters }).catch(() => null)
+        : Promise.resolve(null),
+      fetchAirspace({ lat, lon, radiusMeters }),
+    ]);
+
+    if (liveResult && liveResult.cameras.length > 0) {
+      flockCameras = mergeFlockCameras(flockCameras, liveResult.cameras, 250).sort(
+        (a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0)
+      );
+      flockSource =
+        flockSource === "fallback" || flockSource.includes("empty")
+          ? liveResult.source
+          : `${flockSource}+${liveResult.source}`;
+    } else if (needOverpass && flockCameras.length === 0) {
+      flockCameras = filterByRadius(FALLBACK_FLOCK, lat, lon, radiusMeters);
+      flockSource = "fallback";
     }
 
     if (dbOk) {
       try {
         await query(
           `INSERT INTO inspection_events
-             (latitude, longitude, radius_m, webcam_count, audio_count, flock_count)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+             (latitude, longitude, radius_m, webcam_count, audio_count, aircraft_count, flock_count)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             lat,
             lon,
             radiusMeters,
             webcams.length,
             audioFeeds.length,
+            airspace.aircraft.length,
             flockCameras.length,
           ]
         );
-        await query(
-          `DELETE FROM inspection_events WHERE created_at < NOW() - INTERVAL '7 days'`
-        );
+        // Opportunistic retention (cheap enough; indexed by created_at)
+        if (Math.random() < 0.1) {
+          await query(
+            `DELETE FROM inspection_events WHERE created_at < NOW() - INTERVAL '7 days'`
+          );
+        }
       } catch {
         // non-fatal
       }
     }
-
-    const airspace = await fetchAirspace({
-      lat,
-      lon,
-      radiusMeters,
-    });
 
     return NextResponse.json({
       latitude: lat,

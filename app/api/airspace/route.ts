@@ -26,12 +26,48 @@ export async function GET(request: Request) {
     );
     const format = searchParams.get("format") ?? "json";
 
+    const hasPoint = lat != null && lon != null;
+    const hasBox =
+      lamin != null && lamax != null && lomin != null && lomax != null;
+    if (!hasPoint && !hasBox) {
+      return NextResponse.json(
+        {
+          error:
+            "Provide lat/lon (with optional radiusMiles) or lamin/lamax/lomin/lomax",
+          aircraft: [],
+          source: "error",
+          count: 0,
+        },
+        { status: 400 }
+      );
+    }
+
     const clampBox = (v: number | undefined, min: number, max: number) =>
       v == null || !Number.isFinite(v) ? undefined : Math.max(min, Math.min(max, v));
 
+    let pointLat: number | undefined;
+    let pointLon: number | undefined;
+    if (hasPoint) {
+      const parsedLat = Number(lat);
+      const parsedLon = Number(lon);
+      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLon)) {
+        return NextResponse.json(
+          {
+            error: "lat and lon must be numeric",
+            aircraft: [],
+            source: "error",
+            count: 0,
+          },
+          { status: 400 }
+        );
+      }
+      pointLat = clampLat(parsedLat);
+      pointLon = clampLon(parsedLon);
+    }
+
     const result = await fetchAirspace({
-      lat: lat != null ? clampLat(Number(lat)) : undefined,
-      lon: lon != null ? clampLon(Number(lon)) : undefined,
+      lat: pointLat,
+      lon: pointLon,
       radiusMeters: milesToMeters(clampRadiusMiles(radiusMiles)),
       lamin: clampBox(lamin != null ? Number(lamin) : undefined, -90, 90),
       lamax: clampBox(lamax != null ? Number(lamax) : undefined, -90, 90),

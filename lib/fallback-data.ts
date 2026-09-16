@@ -408,7 +408,7 @@ export const FALLBACK_AUDIO: AudioFeed[] = [
 export const FALLBACK_FLOCK: FlockCamera[] = [
   {
     id: "flock-nyc-1",
-    osmId: null,
+    osmId: "seed-nyc-1",
     name: "Flock Falcon — Midtown E 42nd",
     manufacturer: "Flock Safety",
     model: "Falcon",
@@ -427,7 +427,7 @@ export const FALLBACK_FLOCK: FlockCamera[] = [
   },
   {
     id: "flock-nyc-2",
-    osmId: null,
+    osmId: "seed-nyc-2",
     name: "Flock Falcon — FDR Drive / 34th",
     manufacturer: "Flock Safety",
     model: "Falcon",
@@ -465,7 +465,7 @@ export const FALLBACK_FLOCK: FlockCamera[] = [
   },
   {
     id: "flock-jfk-1",
-    osmId: null,
+    osmId: "seed-jfk-1",
     name: "Flock Falcon — JFK Van Wyck corridor",
     manufacturer: "Flock Safety",
     model: "Falcon",
@@ -484,7 +484,7 @@ export const FALLBACK_FLOCK: FlockCamera[] = [
   },
   {
     id: "flock-lax-1",
-    osmId: null,
+    osmId: "seed-lax-1",
     name: "Flock Falcon — Century Blvd / LAX",
     manufacturer: "Flock Safety",
     model: "Falcon",
@@ -503,7 +503,7 @@ export const FALLBACK_FLOCK: FlockCamera[] = [
   },
   {
     id: "flock-chi-1",
-    osmId: null,
+    osmId: "seed-chi-1",
     name: "Flock Falcon — Loop Wacker Dr",
     manufacturer: "Flock Safety",
     model: "Falcon",

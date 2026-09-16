@@ -7,6 +7,8 @@ const connectionString =
 declare global {
   // eslint-disable-next-line no-var
   var __masterEyePool: Pool | undefined;
+  // eslint-disable-next-line no-var
+  var __masterEyeDbHealth: { ok: boolean; checkedAt: number } | undefined;
 }
 
 function createPool(): Pool {
@@ -34,11 +36,20 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   return { rows: result.rows, rowCount: result.rowCount };
 }
 
+const DB_HEALTH_TTL_MS = 15_000;
+
+/** Cached ping — avoids SELECT 1 on every API hit during layer polls. */
 export async function isDatabaseAvailable(): Promise<boolean> {
+  const cached = global.__masterEyeDbHealth;
+  if (cached && Date.now() - cached.checkedAt < DB_HEALTH_TTL_MS) {
+    return cached.ok;
+  }
   try {
     await query("SELECT 1");
+    global.__masterEyeDbHealth = { ok: true, checkedAt: Date.now() };
     return true;
   } catch {
+    global.__masterEyeDbHealth = { ok: false, checkedAt: Date.now() };
     return false;
   }
 }

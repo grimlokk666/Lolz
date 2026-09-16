@@ -58,49 +58,58 @@ function mapRow(row: FlockRow): FlockCamera {
 }
 
 async function upsertOverpassCameras(cameras: FlockCamera[]): Promise<void> {
-  for (const cam of cameras.slice(0, 200)) {
-    try {
-      await query(
-        `INSERT INTO flock_cameras (
-           osm_id, name, manufacturer, model, operator, city, state, country, country_code,
-           latitude, longitude, direction, surveillance_type, source, tags, is_active, last_seen_at, updated_at
-         ) VALUES (
-           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'overpass',$14,TRUE,NOW(),NOW()
-         )
-         ON CONFLICT (osm_id) DO UPDATE SET
-           name = EXCLUDED.name,
-           manufacturer = EXCLUDED.manufacturer,
-           model = EXCLUDED.model,
-           operator = EXCLUDED.operator,
-           city = COALESCE(EXCLUDED.city, flock_cameras.city),
-           state = COALESCE(EXCLUDED.state, flock_cameras.state),
-           latitude = EXCLUDED.latitude,
-           longitude = EXCLUDED.longitude,
-           direction = EXCLUDED.direction,
-           tags = EXCLUDED.tags,
-           is_active = TRUE,
-           last_seen_at = NOW(),
-           updated_at = NOW()`,
-        [
-          cam.osmId,
-          cam.name,
-          cam.manufacturer,
-          cam.model,
-          cam.operator,
-          cam.city,
-          cam.state,
-          cam.country,
-          cam.countryCode,
-          cam.latitude,
-          cam.longitude,
-          cam.direction,
-          cam.surveillanceType,
-          cam.tags,
-        ]
-      );
-    } catch {
-      // non-fatal per-row
-    }
+  const batch = cameras.filter((c) => c.osmId).slice(0, 200);
+  if (batch.length === 0) return;
+
+  const values: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+  for (const cam of batch) {
+    values.push(
+      `($${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},'overpass',$${i++},TRUE,NOW(),NOW())`
+    );
+    params.push(
+      cam.osmId,
+      cam.name,
+      cam.manufacturer,
+      cam.model,
+      cam.operator,
+      cam.city,
+      cam.state,
+      cam.country,
+      cam.countryCode,
+      cam.latitude,
+      cam.longitude,
+      cam.direction,
+      cam.surveillanceType,
+      cam.tags
+    );
+  }
+
+  try {
+    await query(
+      `INSERT INTO flock_cameras (
+         osm_id, name, manufacturer, model, operator, city, state, country, country_code,
+         latitude, longitude, direction, surveillance_type, source, tags, is_active, last_seen_at, updated_at
+       ) VALUES ${values.join(",")}
+       ON CONFLICT (osm_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         manufacturer = EXCLUDED.manufacturer,
+         model = EXCLUDED.model,
+         operator = EXCLUDED.operator,
+         city = COALESCE(EXCLUDED.city, flock_cameras.city),
+         state = COALESCE(EXCLUDED.state, flock_cameras.state),
+         latitude = EXCLUDED.latitude,
+         longitude = EXCLUDED.longitude,
+         direction = EXCLUDED.direction,
+         tags = EXCLUDED.tags,
+         is_active = TRUE,
+         last_seen_at = NOW(),
+         updated_at = NOW()`,
+      params
+    );
+  } catch {
+    // non-fatal — live response already returned to client
   }
 }
 
@@ -172,14 +181,14 @@ export async function GET(request: Request) {
              AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3)
            ORDER BY distance_m ASC
            LIMIT 250`,
-          [latitude, longitude, radiusMeters]
+          [safeLat, safeLon, radiusMeters]
         );
         cameras = rows.map(mapRow);
         source = "postgis";
       }
 
       if (cameras.length === 0) {
-        cameras = filterByRadius(FALLBACK_FLOCK, latitude, longitude, radiusMeters);
+        cameras = filterByRadius(FALLBACK_FLOCK, safeLat, safeLon, radiusMeters);
         source = "fallback";
       }
 
@@ -187,9 +196,9 @@ export async function GET(request: Request) {
         cameras,
         count: cameras.length,
         source,
-        latitude,
-        longitude,
-        radiusMiles,
+        latitude: safeLat,
+        longitude: safeLon,
+        radiusMiles: safeRadiusMiles,
         queriedAt: new Date().toISOString(),
       });
     }

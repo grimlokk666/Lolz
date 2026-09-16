@@ -6,7 +6,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import HudToolbar from "@/components/HudToolbar";
 import RegionalInspector from "@/components/RegionalInspector";
 import { useMasterEyeStore } from "@/lib/store";
-import { mergeFlockCameras } from "@/lib/flock";
+import { mergeFlockCameras } from "@/lib/flock-merge";
 import type { Aircraft, RegionalInspection } from "@/types/master-eye";
 import {
   clampRadiusMiles,
@@ -29,34 +29,30 @@ function mapTelemetryAircraft(raw: Record<string, unknown>): Aircraft | null {
   const icao24 = String(raw.icao24 ?? "");
   if (!icao24 || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-  const altitudeM =
-    raw.altitudeM != null
-      ? Number(raw.altitudeM)
-      : raw.altitudeM != null
-        ? Number(raw.altitudeM)
-        : NaN;
-  const velocityMs =
-    raw.velocityMs != null
-      ? Number(raw.velocityMs)
-      : raw.velocityMs != null
-        ? Number(raw.velocityMs)
-        : NaN;
+  const altitudeM = Number(raw.altitudeM ?? raw.altitude_m);
+  const velocityMs = Number(raw.velocityMs ?? raw.velocity_ms);
+  const heading = Number(raw.heading);
+  const verticalRate = Number(raw.verticalRate ?? raw.vertical_rate);
+  const lastContact = Number(raw.lastContact ?? raw.last_contact);
 
   return {
     icao24,
     callsign: raw.callsign != null ? String(raw.callsign) : null,
     originCountry:
-      raw.originCountry != null ? String(raw.originCountry) : null,
+      raw.originCountry != null
+        ? String(raw.originCountry)
+        : raw.origin_country != null
+          ? String(raw.origin_country)
+          : null,
     latitude: lat,
     longitude: lon,
     altitudeM: Number.isFinite(altitudeM) ? altitudeM : null,
     velocityMs: Number.isFinite(velocityMs) ? velocityMs : null,
-    heading: raw.heading != null ? Number(raw.heading) : null,
-    verticalRate:
-      raw.verticalRate != null ? Number(raw.verticalRate) : null,
+    heading: Number.isFinite(heading) ? heading : null,
+    verticalRate: Number.isFinite(verticalRate) ? verticalRate : null,
     squawk: raw.squawk != null ? String(raw.squawk) : null,
-    onGround: Boolean(raw.onGround),
-    lastContact: raw.lastContact != null ? Number(raw.lastContact) : null,
+    onGround: Boolean(raw.onGround ?? raw.on_ground),
+    lastContact: Number.isFinite(lastContact) ? lastContact : null,
   };
 }
 
@@ -96,16 +92,19 @@ export default function CommandCenter() {
     let cancelled = false;
 
     async function loadLayers() {
-      const endpoints = [
-        { key: "webcams" as const, url: "/api/webcams" },
-        { key: "audio" as const, url: "/api/audio-feeds" },
-        {
-          key: "aircraft" as const,
+      const endpoints: { key: "webcams" | "audio" | "aircraft" | "flock"; url: string }[] = [
+        { key: "webcams", url: "/api/webcams" },
+        { key: "audio", url: "/api/audio-feeds" },
+        { key: "flock", url: "/api/flock" },
+      ];
+      // Skip OpenSky HTTP when telemetry WS already feeds aircraft (saves credits).
+      if (!telemetryLiveRef.current) {
+        endpoints.push({
+          key: "aircraft",
           // Credit-friendly NE corridor (~1 OpenSky credit). Full CONUS costs 4.
           url: "/api/airspace?lamin=38&lamax=43&lomin=-80&lomax=-71",
-        },
-        { key: "flock" as const, url: "/api/flock" },
-      ];
+        });
+      }
 
       const results = await Promise.allSettled(
         endpoints.map(async (ep) => {
@@ -199,14 +198,10 @@ export default function CommandCenter() {
               useMasterEyeStore.getState().globalAircraft.length;
           }
         } else if (key === "flock") {
+          // Global catalog poll replaces; regional inspect merges separately.
           const cameras = (data.cameras as typeof globalFlock) ?? [];
-          setGlobalFlock(
-            mergeFlockCameras(
-              useMasterEyeStore.getState().globalFlock,
-              cameras
-            )
-          );
-          counts.flock = useMasterEyeStore.getState().globalFlock.length;
+          setGlobalFlock(cameras);
+          counts.flock = cameras.length;
           setLayerHealth("flock", {
             status: "live",
             source: String(data.source ?? "api"),
@@ -371,7 +366,7 @@ export default function CommandCenter() {
           aircraft: data.aircraft ?? [],
           flockCameras: data.flockCameras ?? [],
           queriedAt:
-            data.queriedAt ?? data.queriedAt ?? new Date().toISOString(),
+            data.queriedAt ?? new Date().toISOString(),
         };
         setInspection(inspection);
 

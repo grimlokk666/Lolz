@@ -163,7 +163,11 @@ def normalize(el: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "city": tags.get("addr:city"),
         "state": tags.get("addr:state"),
         "country": tags.get("addr:country") or "United States",
-        "country_code": "US",
+        "country_code": (
+            tags.get("addr:country")
+            if tags.get("addr:country") and len(tags.get("addr:country")) == 2
+            else "US"
+        ),
         "latitude": float(lat),
         "longitude": float(lon),
         "direction": parse_direction(tags.get("direction")),
