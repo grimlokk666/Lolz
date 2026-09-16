@@ -4,14 +4,26 @@ import { create } from "zustand";
 import type {
   Aircraft,
   AudioFeed,
+  FlockCamera,
   GlobeClickPayload,
+  LayerId,
   LayerState,
   RegionalInspection,
   WebcamAsset,
 } from "@/types/master-eye";
 
+export type LayerHealthStatus = "idle" | "live" | "degraded" | "error";
+
+export interface LayerHealth {
+  status: LayerHealthStatus;
+  source: string;
+  updatedAt: string | null;
+  count: number;
+}
+
 interface MasterEyeState {
   layers: LayerState;
+  layerHealth: Record<LayerId, LayerHealth>;
   inspectorOpen: boolean;
   inspection: RegionalInspection | null;
   inspectionLoading: boolean;
@@ -22,10 +34,16 @@ interface MasterEyeState {
   globalWebcams: WebcamAsset[];
   globalAudio: AudioFeed[];
   globalAircraft: Aircraft[];
+  globalFlock: FlockCamera[];
+  sectorRadiusMiles: number;
   statusMessage: string;
   clock: string;
   setLayer: (id: keyof LayerState, enabled: boolean) => void;
   toggleLayer: (id: keyof LayerState) => void;
+  setLayerHealth: (
+    id: LayerId,
+    patch: Partial<LayerHealth> & Pick<LayerHealth, "status">
+  ) => void;
   openInspection: (payload: GlobeClickPayload) => void;
   setInspection: (data: RegionalInspection | null) => void;
   setInspectionLoading: (loading: boolean) => void;
@@ -37,12 +55,31 @@ interface MasterEyeState {
   setGlobalWebcams: (cams: WebcamAsset[]) => void;
   setGlobalAudio: (feeds: AudioFeed[]) => void;
   setGlobalAircraft: (aircraft: Aircraft[]) => void;
+  setGlobalFlock: (cameras: FlockCamera[]) => void;
+  setSectorRadiusMiles: (miles: number) => void;
   setStatusMessage: (msg: string) => void;
   tickClock: () => void;
 }
 
+const idleHealth = (): LayerHealth => ({
+  status: "idle",
+  source: "n/a",
+  updatedAt: null,
+  count: 0,
+});
+
+const defaultRadius = Number(
+  process.env.NEXT_PUBLIC_DEFAULT_RADIUS_MILES ?? 25
+);
+
 export const useMasterEyeStore = create<MasterEyeState>((set) => ({
-  layers: { aircraft: true, webcams: true, audio: true },
+  layers: { aircraft: true, webcams: true, audio: true, flock: true },
+  layerHealth: {
+    aircraft: idleHealth(),
+    webcams: idleHealth(),
+    audio: idleHealth(),
+    flock: idleHealth(),
+  },
   inspectorOpen: false,
   inspection: null,
   inspectionLoading: false,
@@ -53,12 +90,21 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   globalWebcams: [],
   globalAudio: [],
   globalAircraft: [],
+  globalFlock: [],
+  sectorRadiusMiles: Number.isFinite(defaultRadius) ? defaultRadius : 25,
   statusMessage: "SYSTEM ONLINE — AWAITING COORDINATE LOCK",
   clock: "",
   setLayer: (id, enabled) =>
     set((s) => ({ layers: { ...s.layers, [id]: enabled } })),
   toggleLayer: (id) =>
     set((s) => ({ layers: { ...s.layers, [id]: !s.layers[id] } })),
+  setLayerHealth: (id, patch) =>
+    set((s) => ({
+      layerHealth: {
+        ...s.layerHealth,
+        [id]: { ...s.layerHealth[id], ...patch },
+      },
+    })),
   openInspection: (payload) =>
     set({
       inspectorOpen: true,
@@ -89,11 +135,12 @@ export const useMasterEyeStore = create<MasterEyeState>((set) => ({
   setGlobalWebcams: (cams) => set({ globalWebcams: cams }),
   setGlobalAudio: (feeds) => set({ globalAudio: feeds }),
   setGlobalAircraft: (aircraft) => set({ globalAircraft: aircraft }),
+  setGlobalFlock: (cameras) => set({ globalFlock: cameras }),
+  setSectorRadiusMiles: (miles) => set({ sectorRadiusMiles: miles }),
   setStatusMessage: (msg) => set({ statusMessage: msg }),
   tickClock: () => set({ clock: new Date().toISOString() }),
 }));
 
-// Avoid SSR/client mismatch: seed clock only on client
 if (typeof window !== "undefined") {
   useMasterEyeStore.setState({ clock: new Date().toISOString() });
 }

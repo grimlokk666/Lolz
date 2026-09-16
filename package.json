@@ -12,6 +12,8 @@
     "telemetry": "node services/telemetry/index.js",
     "worker:webcams": "python3 workers/webcam_discovery.py --once",
     "worker:webcams:loop": "python3 workers/webcam_discovery.py",
+    "worker:flock": "python3 workers/flock_discovery.py --once",
+    "worker:flock:loop": "python3 workers/flock_discovery.py",
     "db:up": "docker compose up -d postgis",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgis",

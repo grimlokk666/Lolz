@@ -27,8 +27,8 @@ services:
       PORT: 4100
       DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
       CORS_ORIGIN: http://localhost:3000
-      OPENSKY_USERNAME: ${OPENSKY_USERNAME:-}
-      OPENSKY_PASSWORD: ${OPENSKY_PASSWORD:-}
+      OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
+      OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
     ports:
       - "4100:4100"
     depends_on:
@@ -45,6 +45,22 @@ services:
       DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
       SHODAN_API_KEY: ${SHODAN_API_KEY:-}
       WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-300}
+      WORKER_DEMO_MODE: ${WORKER_DEMO_MODE:-true}
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  flock-worker:
+    build:
+      context: ./workers
+      dockerfile: Dockerfile
+    container_name: master-eye-flock-worker
+    command: ["python", "flock_discovery.py"]
+    environment:
+      DATABASE_URL: postgresql://mastereye:mastereye_dev@postgis:5432/mastereye
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-600}
       WORKER_DEMO_MODE: ${WORKER_DEMO_MODE:-true}
     depends_on:
       postgis:

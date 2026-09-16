@@ -65,3 +65,25 @@ ON CONFLICT (name, latitude, longitude) DO UPDATE SET
   description = EXCLUDED.description,
   is_active = TRUE,
   updated_at = NOW();
+
+-- Seed Flock / ALPR cameras (demo)
+INSERT INTO flock_cameras (
+  osm_id, name, manufacturer, model, operator, city, state, country, country_code,
+  latitude, longitude, direction, surveillance_type, source, tags, is_active
+) VALUES
+  ('seed-nyc-1', 'Flock Falcon — Midtown E 42nd', 'Flock Safety', 'Falcon', 'NYPD partner network', 'New York', 'NY', 'United States', 'US', 40.7516, -73.9755, 270, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-nyc-2', 'Flock Falcon — FDR / 34th', 'Flock Safety', 'Falcon', 'NYPD partner network', 'New York', 'NY', 'United States', 'US', 40.7441, -73.9721, 180, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-nyc-3', 'Flock Falcon — Brooklyn Bridge approach', 'Flock Safety', 'Falcon', 'NYPD partner network', 'New York', 'NY', 'United States', 'US', 40.7061, -73.9969, 45, 'ALPR', 'seed', ARRAY['flock','alpr','bridge'], TRUE),
+  ('seed-jfk-1', 'Flock Falcon — JFK Van Wyck', 'Flock Safety', 'Falcon', 'Port Authority / LE', 'Queens', 'NY', 'United States', 'US', 40.6586, -73.7956, 0, 'ALPR', 'seed', ARRAY['flock','alpr','airport'], TRUE),
+  ('seed-lax-1', 'Flock Falcon — Century / LAX', 'Flock Safety', 'Falcon', 'LAPD partner network', 'Los Angeles', 'CA', 'United States', 'US', 33.9456, -118.3947, 90, 'ALPR', 'seed', ARRAY['flock','alpr','airport'], TRUE),
+  ('seed-chi-1', 'Flock Falcon — Loop Wacker', 'Flock Safety', 'Falcon', 'CPD partner network', 'Chicago', 'IL', 'United States', 'US', 41.8865, -87.6368, 180, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-atl-1', 'Flock Falcon — Downtown Peachtree', 'Flock Safety', 'Falcon', 'APD partner network', 'Atlanta', 'GA', 'United States', 'US', 33.7590, -84.3880, 0, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-hou-1', 'Flock Falcon — Downtown Houston', 'Flock Safety', 'Falcon', 'HPD partner network', 'Houston', 'TX', 'United States', 'US', 29.7604, -95.3698, 270, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-mia-1', 'Flock Falcon — Brickell Ave', 'Flock Safety', 'Falcon', 'Miami PD partner', 'Miami', 'FL', 'United States', 'US', 25.7617, -80.1918, 90, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE),
+  ('seed-sea-1', 'Flock Falcon — SODO corridor', 'Flock Safety', 'Falcon', 'SPD partner network', 'Seattle', 'WA', 'United States', 'US', 47.5805, -122.3331, 0, 'ALPR', 'seed', ARRAY['flock','alpr'], TRUE)
+ON CONFLICT (osm_id) DO UPDATE SET
+  name = EXCLUDED.name,
+  latitude = EXCLUDED.latitude,
+  longitude = EXCLUDED.longitude,
+  is_active = TRUE,
+  updated_at = NOW();

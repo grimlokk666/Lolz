@@ -48,17 +48,50 @@ export function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+/** Clamp helpers for API / operator input. */
+export function clampLat(lat: number): number {
+  return Math.max(-90, Math.min(90, lat));
+}
+
+export function clampLon(lon: number): number {
+  if (!Number.isFinite(lon)) return 0;
+  let x = lon;
+  while (x < -180) x += 360;
+  while (x > 180) x -= 360;
+  return x;
+}
+
+export function clampRadiusMiles(miles: number, min = 1, max = 250): number {
+  if (!Number.isFinite(miles)) return min;
+  return Math.max(min, Math.min(max, miles));
+}
+
+export function isEmergencySquawk(squawk: string | null | undefined): boolean {
+  return squawk === "7700" || squawk === "7600" || squawk === "7500";
+}
+
+/**
+ * Pole-safe bbox. Near ±90° cos(lat)→0; clamp longitude span to the full globe
+ * so OpenSky / Overpass queries never receive NaN/Infinity.
+ */
 export function bboxFromCenter(
   lat: number,
   lon: number,
   radiusMeters: number
 ): { lamin: number; lamax: number; lomin: number; lomax: number } {
+  const safeLat = clampLat(lat);
+  const safeLon = clampLon(lon);
   const dLat = radiusMeters / 111320;
-  const dLon = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
+  const cosLat = Math.cos((safeLat * Math.PI) / 180);
+  const dLon =
+    Math.abs(cosLat) < 1e-6
+      ? 180
+      : radiusMeters / (111320 * Math.abs(cosLat));
+
   return {
-    lamin: lat - dLat,
-    lamax: lat + dLat,
-    lomin: lon - dLon,
-    lomax: lon + dLon,
+    lamin: clampLat(safeLat - dLat),
+    lamax: clampLat(safeLat + dLat),
+    lomin: Math.max(-180, safeLon - dLon),
+    lomax: Math.min(180, safeLon + dLon),
   };
 }

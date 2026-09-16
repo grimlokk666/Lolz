@@ -11,7 +11,7 @@ Real-time tactical global intelligence and surveillance dashboard. CesiumJS glob
 | API | Next.js Route Handlers (`/api/airspace`, `/api/audio-proxy`, `/api/region`, …) |
 | DB | PostgreSQL + PostGIS |
 | Telemetry bridge | Express + WebSocket (`services/telemetry`) |
-| OSINT worker | Python + Shodan (`workers/webcam_discovery.py`) |
+| OSINT workers | Python Shodan webcam discovery + Flock/ALPR Overpass ingest (`workers/`) |
 
 ## Quick start
 
@@ -43,6 +43,9 @@ npm run worker:webcams
 - **`components/GlobeView.tsx`** — full-screen Cesium viewer, layer entities, click → fly-to
 - **`components/RegionalInspector.tsx`** — cams / airspace / audio inspector drawer
 - **`workers/webcam_discovery.py`** — Shodan OSINT ingest with rate limiting + PostGIS upsert
+- **`workers/flock_discovery.py`** — Overpass OSM ALPR / Flock Safety camera ingest (DeFlock-class public tags)
+- **`/api/flock`** — global + regional Flock/ALPR layer (live Overpass with PostGIS/seed fallback)
+- HUD **Flock ALPR** layer + Regional Inspector **Flock** tab
 - **`app/api/airspace`** — OpenSky / ADS-B proxy, GeoJSON option, demo fallback
 - **`app/api/audio-proxy`** — allowlisted Icecast/Shoutcast CORS/protocol bridge
 - **`app/api/region`** — PostGIS `ST_DWithin` sector query (±25 mi default)
@@ -53,4 +56,4 @@ Dark tactical HUD: obsidian `#030712`, cyan borders, glassmorphism panels (`back
 
 ## Environment
 
-See `.env.example` for `DATABASE_URL`, `SHODAN_API_KEY`, `CESIUM_ION_TOKEN`, OpenSky credentials, and ADS-B RapidAPI keys.
+See `.env.example` for `DATABASE_URL`, `SHODAN_API_KEY`, `NEXT_PUBLIC_CESIUM_ION_TOKEN`, OpenSky OAuth (`OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` from your OpenSky `credentials.json`), and ADS-B RapidAPI keys.

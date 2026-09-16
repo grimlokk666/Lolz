@@ -31,12 +31,32 @@ export default function AudioPlayer({
   const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(streamUrl)}`;
 
   useEffect(() => {
+    const audioEl = audioRef.current;
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
       try {
-        ctxRef.current?.close();
+        sourceRef.current?.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+      sourceRef.current = null;
+      try {
+        analyserRef.current?.disconnect();
       } catch {
         /* noop */
+      }
+      analyserRef.current = null;
+      try {
+        void ctxRef.current?.close();
+      } catch {
+        /* noop */
+      }
+      ctxRef.current = null;
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.removeAttribute("src");
+        audioEl.load();
       }
     };
   }, []);
@@ -89,9 +109,11 @@ export default function AudioPlayer({
       ctxRef.current = new AudioCtx();
       analyserRef.current = ctxRef.current.createAnalyser();
       analyserRef.current.fftSize = 128;
-      sourceRef.current = ctxRef.current.createMediaElementSource(audio);
-      sourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(ctxRef.current.destination);
+      if (!sourceRef.current) {
+        sourceRef.current = ctxRef.current.createMediaElementSource(audio);
+        sourceRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(ctxRef.current.destination);
+      }
     }
     if (ctxRef.current.state === "suspended") {
       await ctxRef.current.resume();
